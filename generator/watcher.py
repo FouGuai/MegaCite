@@ -1,6 +1,6 @@
 import time
-from services.db import create_connection
-from services.static_gen import StaticSiteGenerator
+from dao.factory import create_connection
+from generator.builder import StaticSiteGenerator
 
 class DBWatcher:
     """

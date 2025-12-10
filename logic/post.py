@@ -1,7 +1,7 @@
 from typing import Any
-from dao.database import MySQLPostDAO
-from services.db import create_connection
-from services.auth_service import verify_token
+from dao import MySQLPostDAO
+from dao.factory import create_connection
+from logic.auth import verify_token
 from core.security import generate_cid
 
 def post_list(token: str, count: int | None = None) -> list[str]:
@@ -15,13 +15,7 @@ def post_list(token: str, count: int | None = None) -> list[str]:
         conn.close()
 
 def post_create(token: str) -> str:
-    """
-    创建文章，自动生成 CID。
-    Returns: 新生成的 CID
-    """
     user_id = verify_token(token)
-    
-    # 生成唯一 CID
     new_cid = generate_cid()
     
     conn = create_connection()

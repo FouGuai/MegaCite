@@ -1,7 +1,7 @@
 import os
 from core.url_manager import URLManager
-from services.renderer import HTMLRenderer
-from services.db import create_connection
+from generator.renderer import HTMLRenderer
+from dao.factory import create_connection
 
 class StaticSiteGenerator:
     """
@@ -24,14 +24,10 @@ class StaticSiteGenerator:
         cid = post_data["cid"]
         title = post_data["title"] or "untitled"
         
-        # 1. 获取路径前缀 (username/Title-With-Hyphens)
         rel_prefix = self.url_mgr.register_mapping(cid, author_name, title)
-        
-        # 2. 拼接 .html 后缀作为物理文件名
         filename = rel_prefix + ".html"
         full_path = self._get_abs_path(filename)
         
-        # 3. 写入文件
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         html = self.renderer.render_post(post_data, author_name, cid)
         
@@ -56,11 +52,7 @@ class StaticSiteGenerator:
             post_list = []
             for r in rows:
                 p_cid, p_title = r[0], r[1] or "untitled"
-                
-                # 获取路径前缀
                 rel_prefix = self.url_mgr.register_mapping(p_cid, username, p_title)
-                
-                # 文件名必须包含 .html
                 file_name = os.path.basename(rel_prefix) + ".html"
                 post_list.append({"title": p_title, "filename": file_name})
             

@@ -41,7 +41,6 @@ class HTMLRenderer:
     def render_user_index(self, username: str, post_list: list[dict]) -> str:
         items = []
         for p in post_list:
-            # 链接直接指向同级目录下的 .html 文件
             items.append(f'<li><a href="{p["filename"]}">{p["title"]}</a></li>')
         
         return self.TEMPLATE_INDEX.format(
@@ -51,7 +50,6 @@ class HTMLRenderer:
 
     def render_post(self, post_data: dict, author_name: str, cid: str) -> str:
         raw_content = str(post_data.get("context", "") or "")
-        # 使用 markdown 库渲染 HTML
         content = markdown.markdown(raw_content)
         
         return self.TEMPLATE_POST.format(
