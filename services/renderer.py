@@ -1,0 +1,61 @@
+class HTMLRenderer:
+    """渲染 HTML 内容，生成的链接必须显式包含 .html 后缀"""
+
+    TEMPLATE_INDEX = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{username}'s Blog</title>
+</head>
+<body>
+    <h1>Articles by {username}</h1>
+    <hr>
+    <ul>
+        {list_items}
+    </ul>
+</body>
+</html>
+"""
+
+    TEMPLATE_POST = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{title}</title>
+</head>
+<body>
+    <h1>{title}</h1>
+    <p>Date: {date} | Author: {author}</p>
+    <hr>
+    <div>
+        {content}
+    </div>
+    <hr>
+    <a href="index.html">Back to Index</a>
+</body>
+</html>
+"""
+
+    def render_user_index(self, username: str, post_list: list[dict]) -> str:
+        """
+        渲染索引页。
+        post_list item: {"title": "Raw Title", "filename": "EncodedTitle.html"}
+        """
+        items = []
+        for p in post_list:
+            # 链接直接指向同级目录下的 .html 文件
+            items.append(f'<li><a href="{p["filename"]}">{p["title"]}</a></li>')
+        
+        return self.TEMPLATE_INDEX.format(
+            username=username,
+            list_items="\n".join(items) if items else "<li>No posts.</li>"
+        )
+
+    def render_post(self, post_data: dict, author_name: str, cid: str) -> str:
+        content = post_data.get("context", "") or ""
+        return self.TEMPLATE_POST.format(
+            title=post_data.get("title", "Untitled"),
+            date=post_data.get("date", ""),
+            author=author_name,
+            content=str(content).replace("\n", "<br>")
+        )
