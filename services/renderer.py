@@ -1,3 +1,5 @@
+import markdown
+
 class HTMLRenderer:
     """渲染 HTML 内容"""
 
@@ -48,7 +50,10 @@ class HTMLRenderer:
         )
 
     def render_post(self, post_data: dict, author_name: str, cid: str) -> str:
-        content = str(post_data.get("context", "") or "").replace("\n", "<br>")
+        raw_content = str(post_data.get("context", "") or "")
+        # 使用 markdown 库渲染 HTML
+        content = markdown.markdown(raw_content)
+        
         return self.TEMPLATE_POST.format(
             title=post_data.get("title", "Untitled"),
             date=post_data.get("date", ""),

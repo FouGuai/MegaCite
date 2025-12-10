@@ -86,7 +86,9 @@ def main():
                 print(f"Post created. CID: {new_cid}")
             
             elif args.action == "update":
-                ok = post_service.post_update(token, args.cid, args.field, args.value)
+                # 修复：处理转义字符，将字面量 \n 转换为换行符
+                value = args.value.replace("\\n", "\n")
+                ok = post_service.post_update(token, args.cid, args.field, value)
                 print("Success" if ok else "Failed")
             
             elif args.action == "delete":
