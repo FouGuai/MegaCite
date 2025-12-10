@@ -52,5 +52,6 @@ CREATE TABLE post_references (
 
 
 -- 改密码
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '114514';
+-- ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '114514';
+ALTER USER 'root'@'localhost' IDENTIFIED BY '114514';
 FLUSH PRIVILEGES;

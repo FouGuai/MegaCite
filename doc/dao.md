@@ -1,12 +1,8 @@
-
-
+---
+title: DAO 接口文档
 ---
 
-# # 📘 DAO 接口文档（Markdown 版本）
-
----
-
-# ## 👤 UserDAO（用户数据访问层）
+## 👤 UserDAO（用户数据访问层）
 
 ```python
 class UserDAO(ABC):
@@ -54,9 +50,7 @@ class UserDAO(ABC):
         """
 ```
 
----
-
-# ## 🔐 AuthDAO（外部认证平台管理）
+## 🔐 AuthDAO（外部认证平台管理）
 
 ```python
 class AuthDAO(ABC):
@@ -104,9 +98,8 @@ class AuthDAO(ABC):
         """
 ```
 
----
+## 📝 PostDAO（文章数据访问层）
 
-# ## 📝 PostDAO（文章数据访问层）
 ```python
 class PostDAO(ABC):
 
@@ -178,9 +171,7 @@ class PostDAO(ABC):
         """
 ```
 
----
-
-# ## 🔗 PostReferenceDAO（文章引用管理）
+## 🔗 PostReferenceDAO（文章引用管理）
 
 ```python
 class PostReferenceDAO(ABC):
@@ -214,8 +205,8 @@ class PostReferenceDAO(ABC):
         """
 ```
 
-
 ## 数据库定义
+
 ```sql
 CREATE TABLE users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
