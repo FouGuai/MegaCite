@@ -5,8 +5,7 @@ from services.db import create_connection
 
 class StaticSiteGenerator:
     """
-    负责将内容写入 public/ 目录。
-    文件路径 = public/username/EncodedTitle.html
+    生成静态文件到 public/ 目录。
     """
     
     def __init__(self, base_dir="public"):
@@ -25,10 +24,10 @@ class StaticSiteGenerator:
         cid = post_data["cid"]
         title = post_data["title"] or "untitled"
         
-        # 1. 获取路径前缀 (username/EncodedTitle)
+        # 1. 获取路径前缀 (username/Title-With-Hyphens)
         rel_prefix = self.url_mgr.register_mapping(cid, author_name, title)
         
-        # 2. 拼接 .html 后缀，形成物理文件名
+        # 2. 拼接 .html 后缀作为物理文件名
         filename = rel_prefix + ".html"
         full_path = self._get_abs_path(filename)
         
@@ -44,31 +43,27 @@ class StaticSiteGenerator:
     def sync_user_index(self, user_id: int):
         conn = create_connection()
         try:
-            # 获取用户名
             with conn.cursor() as cur:
                 cur.execute("SELECT username FROM users WHERE id=%s", (user_id,))
                 row = cur.fetchone()
                 if not row: return
                 username = row[0]
 
-            # 获取用户所有文章
             with conn.cursor() as cur:
                 cur.execute("SELECT cid, title FROM posts WHERE owner_id=%s ORDER BY date DESC", (user_id,))
                 rows = cur.fetchall()
 
             post_list = []
             for r in rows:
-                p_cid, p_title = r[0], r[1]
-                p_title = p_title or "untitled"
+                p_cid, p_title = r[0], r[1] or "untitled"
                 
                 # 获取路径前缀
                 rel_prefix = self.url_mgr.register_mapping(p_cid, username, p_title)
                 
-                # 列表中的链接需要文件名 + .html
+                # 文件名必须包含 .html
                 file_name = os.path.basename(rel_prefix) + ".html"
                 post_list.append({"title": p_title, "filename": file_name})
             
-            # 生成 index.html
             html = self.renderer.render_user_index(username, post_list)
             index_path = self._get_abs_path(f"{username}/index.html")
             
@@ -76,7 +71,7 @@ class StaticSiteGenerator:
             with open(index_path, "w", encoding="utf-8") as f:
                 f.write(html)
             
-            print(f"[Gen] Updated Index: {index_path}")
+            print(f"[Gen] Index Updated: {index_path}")
 
         finally:
             conn.close()

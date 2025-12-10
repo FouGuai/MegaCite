@@ -1,14 +1,13 @@
 import urllib.parse
+import re
 
 class URLManager:
     """
-    负责将 CID 映射到 'username/safe_title' 格式的相对路径（不含后缀）。
+    负责路径映射。
+    策略：强制 Slug 化，将空格和特殊字符转换为连字符，确保文件名干净且可读。
     """
     _instance = None
-    
-    # 双向映射
-    _cid_to_relpath: dict[str, str] = {}
-    _relpath_to_cid: dict[str, str] = {}
+    _cid_map: dict[str, str] = {} # cid -> rel_path
 
     def __new__(cls):
         if cls._instance is None:
@@ -17,39 +16,30 @@ class URLManager:
 
     def safe_title(self, title: str) -> str:
         """
-        将标题转换为 URL 安全字符串。
-        1. 替换文件系统非法字符（如 / \）
-        2. 进行 URL 编码（确保空格等字符在浏览器中合法）
+        生成 URL 安全标题 (Slug)。
+        Example: "Hello World" -> "Hello-World"
         """
         if not title:
             return "untitled"
         
-        # 预处理：将路径分隔符替换为连字符，避免生成多级目录
-        safe_str = title.replace("/", "-").replace("\\", "-")
+        # 1. 去除首尾空格
+        safe = title.strip()
         
-        # URL 编码：例如 "Hello World" -> "Hello%20World"
-        # 这样生成的物理文件名也会包含 %20，浏览器直接访问即可
-        return urllib.parse.quote(safe_str)
+        # 2. 将空格、斜杠、反斜杠替换为连字符
+        safe = safe.replace(" ", "-").replace("/", "-").replace("\\", "-")
+        
+        # 3. 移除多余的连字符 (e.g. "Hello--World" -> "Hello-World")
+        while "--" in safe:
+            safe = safe.replace("--", "-")
+            
+        # 4. URL 编码 (处理中文等非 ASCII 字符)
+        return urllib.parse.quote(safe)
 
     def register_mapping(self, cid: str, username: str, title: str) -> str:
-        """
-        注册映射，返回相对路径前缀。
-        Return: "username/EncodedTitle"
-        """
+        """返回相对路径前缀: username/safe-title"""
         rel_path = f"{username}/{self.safe_title(title)}"
-        
-        # 更新映射，处理旧路径残留
-        old_path = self._cid_to_relpath.get(cid)
-        if old_path and old_path != rel_path:
-            if old_path in self._relpath_to_cid:
-                del self._relpath_to_cid[old_path]
-        
-        self._cid_to_relpath[cid] = rel_path
-        self._relpath_to_cid[rel_path] = cid
+        self._cid_map[cid] = rel_path
         return rel_path
 
     def remove_mapping(self, cid: str) -> str | None:
-        path = self._cid_to_relpath.pop(cid, None)
-        if path and path in self._relpath_to_cid:
-            del self._relpath_to_cid[path]
-        return path
+        return self._cid_map.pop(cid, None)
