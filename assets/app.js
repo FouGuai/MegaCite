@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnLogout = document.getElementById('btn-logout');
     const linkMyHome = document.getElementById('link-my-home');
     
-    // Modal Elements
+    // Auth Modal Elements
     const modalOverlay = document.getElementById('login-modal');
     const btnCancel = document.getElementById('btn-cancel-login');
     const btnSubmit = document.getElementById('btn-submit-auth');
@@ -15,14 +15,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabLogin = document.getElementById('tab-login');
     const tabRegister = document.getElementById('tab-register');
 
-    // Settings Page Elements
+    // QR Modal Elements
+    const qrModal = document.getElementById('qr-modal');
+    const qrImage = document.getElementById('qr-image');
+    const qrLoading = document.getElementById('qr-loading');
+    const btnCancelQr = document.getElementById('btn-cancel-qr');
+    let authTimer = null;
+
+    // Settings Page
     const settingsForm = document.getElementById('settings-form');
     const inpOldPass = document.getElementById('inp-old-pass');
     const inpNewPass = document.getElementById('inp-new-pass');
-
     let isRegisterMode = false;
 
-    // --- Toast Function (Updated for better visuals) ---
     function showToast(message) {
         let container = document.querySelector('.toast-container');
         if (!container) {
@@ -41,20 +46,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
-    // --- Auth State ---
     function updateUI() {
         const token = localStorage.getItem('mc_token');
         const username = localStorage.getItem('mc_username');
-        
         if (token && username) {
             if(guestArea) guestArea.style.display = 'none';
             if(userArea) userArea.style.display = 'flex';
-            if(usernameDisplay) {
-                usernameDisplay.textContent = username;
-            }
-            if(linkMyHome) {
-                linkMyHome.href = `/${username}/index.html`;
-            }
+            if(usernameDisplay) usernameDisplay.textContent = username;
+            if(linkMyHome) linkMyHome.href = `/${username}/index.html`;
         } else {
             if(guestArea) guestArea.style.display = 'inline-block';
             if(userArea) userArea.style.display = 'none';
@@ -62,9 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     updateUI();
 
-    // --- Event Listeners ---
-
-    // Logout
     if (btnLogout) {
         btnLogout.addEventListener('click', (e) => {
             e.preventDefault();
@@ -72,14 +68,12 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('mc_username');
             updateUI();
             showToast('已退出登录');
-            // 如果在设置页或私人主页，退回 Landing Page
             if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
                 setTimeout(() => window.location.href = '/', 500);
             }
         });
     }
 
-    // Modal Control
     const openModal = (e) => {
         if(e) e.preventDefault();
         if(modalOverlay) modalOverlay.classList.add('open');
@@ -110,74 +104,48 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabRegister) tabRegister.onclick = () => switchTab(true);
 
     const loginTriggers = document.querySelectorAll('#btn-login-trigger');
-    loginTriggers.forEach(btn => {
-        btn.addEventListener('click', openModal);
-    });
+    loginTriggers.forEach(btn => btn.addEventListener('click', openModal));
 
     if (btnCancel) btnCancel.addEventListener('click', closeModal);
-    
-    if (modalOverlay) {
-        modalOverlay.addEventListener('click', (e) => {
-            if (e.target === modalOverlay) closeModal();
-        });
-    }
+    if (modalOverlay) modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
 
-    // Auth Action (Login / Register)
     if (btnSubmit) {
         btnSubmit.addEventListener('click', async () => {
             const username = inpUser.value.trim();
             const password = inpPass.value.trim();
-
-            if (!username || !password) {
-                showToast('请填写完整信息');
-                return;
-            }
+            if (!username || !password) { showToast('请填写完整信息'); return; }
             
             const originalText = btnSubmit.textContent;
             btnSubmit.disabled = true;
             btnSubmit.textContent = '处理中...';
 
-            const endpoint = isRegisterMode ? '/api/register' : '/api/login';
-
             try {
-                // 如果是注册，先注册再自动尝试登录
                 if (isRegisterMode) {
                     const regRes = await fetch('/api/register', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ username, password })
                     });
-                    if (!regRes.ok) {
-                        const err = await regRes.json();
-                        throw new Error(err.error || '注册失败');
-                    }
+                    if (!regRes.ok) throw new Error((await regRes.json()).error || '注册失败');
                 }
-
-                // 统一执行登录
                 const loginRes = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
-
                 if (loginRes.ok) {
                     const data = await loginRes.json();
                     localStorage.setItem('mc_token', data.token);
                     localStorage.setItem('mc_username', username);
-                    
                     closeModal();
                     updateUI();
-                    showToast(isRegisterMode ? '注册成功，已自动登录' : '欢迎回来');
-
-                    setTimeout(() => {
-                        window.location.href = `/${username}/index.html`;
-                    }, 800);
+                    showToast(isRegisterMode ? '注册成功' : '欢迎回来');
+                    setTimeout(() => window.location.href = `/${username}/index.html`, 800);
                 } else {
-                    const err = await loginRes.json();
-                    throw new Error(err.error || '登录失败');
+                    throw new Error((await loginRes.json()).error || '登录失败');
                 }
             } catch (e) {
-                showToast(e.message || '网络连接错误');
+                showToast(e.message);
             } finally {
                 btnSubmit.disabled = false;
                 btnSubmit.textContent = originalText;
@@ -185,51 +153,117 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Settings Page Logic
     if (settingsForm) {
-        if (!localStorage.getItem('mc_token')) {
-            window.location.href = '/';
-        }
-
+        if (!localStorage.getItem('mc_token')) window.location.href = '/';
         settingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const oldPass = inpOldPass.value;
-            const newPass = inpNewPass.value;
-
-            if (!oldPass || !newPass) {
-                showToast('请填写所有字段');
-                return;
-            }
-
-            const btn = settingsForm.querySelector('button');
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = '修改中...';
-
             try {
                 const res = await fetch('/api/change_password', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': localStorage.getItem('mc_token') 
-                    },
-                    body: JSON.stringify({ old_password: oldPass, new_password: newPass })
+                    headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('mc_token') },
+                    body: JSON.stringify({ old_password: inpOldPass.value, new_password: inpNewPass.value })
                 });
-
                 if (res.ok) {
                     showToast('密码修改成功');
-                    inpOldPass.value = '';
-                    inpNewPass.value = '';
+                    inpOldPass.value = ''; inpNewPass.value = '';
                 } else {
-                    const err = await res.json();
-                    showToast('操作失败: ' + (err.error || '未知错误'));
+                    showToast('失败: ' + (await res.json()).error);
                 }
             } catch (e) {
                 showToast('网络错误');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = originalText;
             }
         });
     }
+
+    // --- QR / Screen Share Logic ---
+    
+    // 1. 点击图片区域发送坐标
+    if (qrImage) {
+        qrImage.addEventListener('click', async (e) => {
+            const rect = qrImage.getBoundingClientRect();
+            // 计算相对坐标
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            try {
+                await fetch('/api/auth/interact', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: 'click',
+                        x: x,
+                        y: y,
+                        width: rect.width,
+                        height: rect.height
+                    })
+                });
+                // 添加点击反馈特效 (可选)
+                const ripple = document.createElement('div');
+                ripple.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;width:10px;height:10px;background:rgba(255,0,0,0.5);border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);animation:ripple 0.5s ease-out;`;
+                document.body.appendChild(ripple);
+                setTimeout(() => ripple.remove(), 500);
+            } catch (err) {
+                console.error("Interaction error:", err);
+            }
+        });
+    }
+
+    window.startAuth = async (platform) => {
+        if (!qrModal) return;
+        qrModal.classList.add('open');
+        qrImage.style.display = 'none';
+        qrLoading.style.display = 'block';
+        qrLoading.textContent = '正在启动远程浏览器...';
+
+        try {
+            const initRes = await fetch('/api/auth/init', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ platform })
+            });
+
+            if (!initRes.ok) throw new Error('启动失败，请检查服务器日志 (Playwright是否安装?)');
+
+            if (authTimer) clearInterval(authTimer);
+            authTimer = setInterval(async () => {
+                try {
+                    const shotRes = await fetch('/api/auth/screenshot');
+                    const shotData = await shotRes.json();
+                    
+                    if (shotData.image) {
+                        qrImage.src = `data:image/png;base64,${shotData.image}`;
+                        qrImage.style.display = 'block';
+                        qrLoading.style.display = 'none';
+                    }
+
+                    const statusRes = await fetch('/api/auth/status');
+                    const statusData = await statusRes.json();
+                    if (statusData.status === 'success') {
+                        clearInterval(authTimer);
+                        showToast('绑定成功！');
+                        qrModal.classList.remove('open');
+                    }
+                } catch (e) {
+                    console.error("Polling error:", e);
+                }
+            }, 1000); 
+
+        } catch (e) {
+            showToast('错误: ' + e.message);
+            qrModal.classList.remove('open');
+        }
+    };
+
+    if (btnCancelQr) {
+        btnCancelQr.addEventListener('click', async () => {
+            if (authTimer) clearInterval(authTimer);
+            qrModal.classList.remove('open');
+            await fetch('/api/auth/cancel', { method: 'POST' });
+        });
+    }
 });
+
+// 添加 ripple 动画
+const style = document.createElement('style');
+style.innerHTML = `@keyframes ripple { 0% { width:0; height:0; opacity:1; } 100% { width:40px; height:40px; opacity:0; } }`;
+document.head.appendChild(style);

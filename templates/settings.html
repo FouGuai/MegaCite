@@ -32,11 +32,39 @@
             <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 32px; color: var(--vp-c-text-1);">账号设置</h1>
             
             <div class="custom-block">
+                <p class="custom-block-title">第三方平台绑定</p>
+                <p style="margin: 0 0 16px 0;">点击绑定后，您可以在弹出的屏幕中点击切换登录方式（如切换到扫码登录）。</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
+                        <span style="font-weight: 500;">CSDN</span>
+                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('csdn')">绑定 / 更新</button>
+                    </div>
+                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
+                        <span style="font-weight: 500;">掘金 (Juejin)</span>
+                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('juejin')">绑定 / 更新</button>
+                    </div>
+                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
+                        <span style="font-weight: 500;">语雀 (Yuque)</span>
+                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('yuque')">绑定 / 更新</button>
+                    </div>
+                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
+                        <span style="font-weight: 500;">简书 (Jianshu)</span>
+                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('jianshu')">绑定 / 更新</button>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
+                        <span style="font-weight: 500;">博客园 (CNBlogs)</span>
+                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('cnblogs')">绑定 / 更新</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="custom-block" style="margin-top: 32px;">
                 <p class="custom-block-title">安全中心</p>
                 <p style="margin: 0;">为了您的账户安全，建议定期更换密码。新密码将立即生效。</p>
             </div>
 
-            <form id="settings-form" style="max-width: 400px; margin-top: 40px;">
+            <form id="settings-form" style="max-width: 400px; margin-top: 24px;">
                 <div style="margin-bottom: 24px;">
                     <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">旧密码</label>
                     <input id="inp-old-pass" type="password" class="form-input" placeholder="请输入当前密码">
@@ -54,6 +82,43 @@
         <footer class="VPFooter">
             © 2025 MegaCite.
         </footer>
+    </div>
+
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-tabs">
+                <div class="modal-tab active" id="tab-login">登录</div>
+                <div class="modal-tab" id="tab-register">注册</div>
+            </div>
+            <div class="modal-inner">
+                <input id="inp-username" type="text" class="form-input" placeholder="用户名" autocomplete="off">
+                <input id="inp-password" type="password" class="form-input" placeholder="密码">
+                <button id="btn-submit-auth" class="btn-submit">立即登录</button>
+                <span id="btn-cancel-login" class="btn-cancel">暂不登录</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen Share Modal -->
+    <div id="qr-modal" class="modal-overlay">
+        <div class="modal-box" style="width: 800px; max-width: 95vw; text-align: center;">
+            <div style="padding: 16px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">远程登录会话</h3>
+                
+                <!-- 容器设为自适应，图片宽度100% -->
+                <div id="qr-container" style="background: #000; border-radius: 4px; overflow: hidden; margin-bottom: 12px; cursor: crosshair; position: relative; min-height: 400px;">
+                    <span id="qr-loading" style="color: #fff; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">正在启动远程环境...</span>
+                    <!-- 图片设为 block 避免底部白边 -->
+                    <img id="qr-image" src="" style="display: none; width: 100%; height: auto; display: block;">
+                </div>
+                
+                <p style="color: var(--vp-c-text-2); font-size: 12px; margin-bottom: 16px;">
+                    您可以直接点击屏幕进行交互（如切换扫码登录）。
+                </p>
+                
+                <button id="btn-cancel-qr" class="btn-cancel" style="width: 100%; border: 1px solid var(--vp-c-divider); padding: 8px; border-radius: 6px; background: white;">取消验证</button>
+            </div>
+        </div>
     </div>
     
     <script src="/app.js"></script>

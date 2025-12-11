@@ -325,7 +325,7 @@
   
   /* Info/Description Block */
   .custom-block { margin: 20px 0; padding: 12px 16px; border-radius: 6px; background-color: var(--vp-c-bg-soft); border: 1px solid var(--vp-c-border); font-size: 14px; color: var(--vp-c-text-2); }
-  .custom-block-title { font-weight: 600; margin-bottom: 6px; color: var(--vp-c-text-1); text-transform: uppercase; letter-spacing: 0.5px; font-size: 12px; }
+  .custom-block-title { font-weight: 600; margin-top: 0; margin-bottom: 6px; color: var(--vp-c-text-1); text-transform: uppercase; letter-spacing: 0.5px; font-size: 12px; }
   
   /* ================= Auth Modal & Forms ================= */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 100; justify-content: center; align-items: center; }
