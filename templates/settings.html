@@ -5,6 +5,81 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>用户设置</title>
     <link href="/style.css" rel="stylesheet">
+    <style>
+        .settings-section {
+            margin-bottom: 40px;
+        }
+        .settings-header {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--vp-c-text-1);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--vp-c-divider);
+        }
+        
+        /* 还原之前的 custom-block 样式但更整洁 */
+        .platform-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .platform-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: var(--vp-c-bg-soft);
+            border: 1px solid var(--vp-c-border);
+            border-radius: 8px;
+            transition: border-color 0.2s;
+        }
+        .platform-card:hover {
+            border-color: var(--vp-c-brand-light);
+        }
+        .platform-name {
+            font-weight: 500;
+            color: var(--vp-c-text-1);
+            font-size: 15px;
+        }
+        
+        .btn-bind {
+            padding: 6px 16px;
+            font-size: 13px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        
+        /* 状态：未绑定 */
+        .btn-bind.status-unbound {
+            background-color: var(--vp-c-brand);
+            color: white;
+        }
+        .btn-bind.status-unbound:hover {
+            background-color: var(--vp-c-brand-dark);
+        }
+
+        /* 状态：已绑定 */
+        .btn-bind.status-bound {
+            background-color: transparent;
+            border-color: var(--vp-c-divider);
+            color: var(--vp-c-text-2);
+        }
+        .btn-bind.status-bound:hover {
+            border-color: var(--vp-c-brand);
+            color: var(--vp-c-brand);
+        }
+
+        /* 状态：加载中 */
+        .btn-bind.status-loading {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: var(--vp-c-bg-mute);
+            color: var(--vp-c-text-3);
+        }
+    </style>
 </head>
 <body>
     <div class="layout">
@@ -29,54 +104,56 @@
         </header>
 
         <main class="container-narrow">
-            <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 32px; color: var(--vp-c-text-1);">账号设置</h1>
+            <h1 style="font-size: 28px; font-weight: 700; margin-bottom: 40px; color: var(--vp-c-text-1);">账号设置</h1>
             
-            <div class="custom-block">
-                <p class="custom-block-title">第三方平台绑定</p>
-                <p style="margin: 0 0 16px 0;">点击绑定后，您可以在弹出的屏幕中点击切换登录方式（如切换到扫码登录）。</p>
-                
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
-                        <span style="font-weight: 500;">CSDN</span>
-                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('csdn')">绑定 / 更新</button>
-                    </div>
-                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
-                        <span style="font-weight: 500;">掘金 (Juejin)</span>
-                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('juejin')">绑定 / 更新</button>
-                    </div>
-                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
-                        <span style="font-weight: 500;">语雀 (Yuque)</span>
-                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('yuque')">绑定 / 更新</button>
-                    </div>
-                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
-                        <span style="font-weight: 500;">简书 (Jianshu)</span>
-                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('jianshu')">绑定 / 更新</button>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid var(--vp-c-divider);">
-                        <span style="font-weight: 500;">博客园 (CNBlogs)</span>
-                        <button class="btn-submit" style="width: auto; padding: 6px 16px; font-size: 13px;" onclick="startAuth('cnblogs')">绑定 / 更新</button>
-                    </div>
+            <!-- 1. 安全中心 -->
+            <div class="settings-section">
+                <div class="custom-block">
+                    <p class="custom-block-title">安全中心</p>
+                    <p style="margin: 0 0 20px 0;">为了您的账户安全，建议定期更换密码。</p>
+                    
+                    <form id="settings-form" style="max-width: 400px;">
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--vp-c-text-2);">旧密码</label>
+                            <input id="inp-old-pass" type="password" class="form-input" placeholder="请输入当前密码">
+                        </div>
+                        
+                        <div style="margin-bottom: 24px;">
+                            <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--vp-c-text-2);">新密码</label>
+                            <input id="inp-new-pass" type="password" class="form-input" placeholder="设置新密码">
+                        </div>
+                        
+                        <button type="submit" class="btn-submit" style="width: auto; padding: 8px 20px;">确认修改</button>
+                    </form>
                 </div>
             </div>
 
-            <div class="custom-block" style="margin-top: 32px;">
-                <p class="custom-block-title">安全中心</p>
-                <p style="margin: 0;">为了您的账户安全，建议定期更换密码。新密码将立即生效。</p>
+            <!-- 2. 第三方平台绑定 -->
+            <div class="settings-section">
+                <h3 class="settings-header">第三方平台绑定</h3>
+                <div class="platform-list" id="platform-list">
+                    <div class="platform-card">
+                        <span class="platform-name">CSDN</span>
+                        <button class="btn-bind status-loading" data-platform="csdn" onclick="startAuth('csdn')">加载中...</button>
+                    </div>
+                    <div class="platform-card">
+                        <span class="platform-name">掘金</span>
+                        <button class="btn-bind status-loading" data-platform="juejin" onclick="startAuth('juejin')">加载中...</button>
+                    </div>
+                    <div class="platform-card">
+                        <span class="platform-name">语雀</span>
+                        <button class="btn-bind status-loading" data-platform="yuque" onclick="startAuth('yuque')">加载中...</button>
+                    </div>
+                    <div class="platform-card">
+                        <span class="platform-name">简书</span>
+                        <button class="btn-bind status-loading" data-platform="jianshu" onclick="startAuth('jianshu')">加载中...</button>
+                    </div>
+                    <div class="platform-card">
+                        <span class="platform-name">博客园</span>
+                        <button class="btn-bind status-loading" data-platform="cnblogs" onclick="startAuth('cnblogs')">加载中...</button>
+                    </div>
+                </div>
             </div>
-
-            <form id="settings-form" style="max-width: 400px; margin-top: 24px;">
-                <div style="margin-bottom: 24px;">
-                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">旧密码</label>
-                    <input id="inp-old-pass" type="password" class="form-input" placeholder="请输入当前密码">
-                </div>
-                
-                <div style="margin-bottom: 32px;">
-                    <label style="display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px;">新密码</label>
-                    <input id="inp-new-pass" type="password" class="form-input" placeholder="请输入新密码">
-                </div>
-                
-                <button type="submit" class="btn-submit">确认修改</button>
-            </form>
         </main>
 
         <footer class="VPFooter">
@@ -84,6 +161,7 @@
         </footer>
     </div>
 
+    <!-- Login Modal -->
     <div id="login-modal" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-tabs">
@@ -101,22 +179,21 @@
 
     <!-- Screen Share Modal -->
     <div id="qr-modal" class="modal-overlay">
-        <div class="modal-box" style="width: 800px; max-width: 95vw; text-align: center;">
-            <div style="padding: 16px;">
-                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">远程登录会话</h3>
+        <div class="modal-box" style="width: 1000px; max-width: 95vw; background: #222; color: #fff;">
+            <div style="padding: 16px; text-align: center;">
+                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 500; opacity: 0.8;">远程浏览器交互</h3>
                 
-                <!-- 容器设为自适应，图片宽度100% -->
-                <div id="qr-container" style="background: #000; border-radius: 4px; overflow: hidden; margin-bottom: 12px; cursor: crosshair; position: relative; min-height: 400px;">
-                    <span id="qr-loading" style="color: #fff; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">正在启动远程环境...</span>
-                    <!-- 图片设为 block 避免底部白边 -->
-                    <img id="qr-image" src="" style="display: none; width: 100%; height: auto; display: block;">
+                <div id="qr-container" style="background: #000; margin: 0 auto; cursor: default; position: relative; min-height: 400px; border: 1px solid #444; display: inline-block;">
+                    <span id="qr-loading" style="color: #aaa; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">正在建立连接...</span>
+                    <!-- 使用 draggable=false 防止拖拽图片 -->
+                    <img id="qr-image" src="" draggable="false" style="display: none; max-width: 100%; max-height: 80vh; vertical-align: bottom;">
                 </div>
                 
-                <p style="color: var(--vp-c-text-2); font-size: 12px; margin-bottom: 16px;">
-                    您可以直接点击屏幕进行交互（如切换扫码登录）。
+                <p style="color: #888; font-size: 12px; margin: 12px 0 16px;">
+                    点击屏幕可直接控制远程浏览器，支持切换登录方式。
                 </p>
                 
-                <button id="btn-cancel-qr" class="btn-cancel" style="width: 100%; border: 1px solid var(--vp-c-divider); padding: 8px; border-radius: 6px; background: white;">取消验证</button>
+                <button id="btn-cancel-qr" class="btn-cancel" style="width: auto; padding: 6px 24px; color: #fff; border: 1px solid #555; background: #333;">取消</button>
             </div>
         </div>
     </div>

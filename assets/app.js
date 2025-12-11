@@ -1,12 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // UI Elements
+    // --- UI Elements ---
     const guestArea = document.getElementById('auth-guest');
     const userArea = document.getElementById('auth-user');
     const usernameDisplay = document.getElementById('username-display');
     const btnLogout = document.getElementById('btn-logout');
     const linkMyHome = document.getElementById('link-my-home');
     
-    // Auth Modal Elements
+    // Modals
     const modalOverlay = document.getElementById('login-modal');
     const btnCancel = document.getElementById('btn-cancel-login');
     const btnSubmit = document.getElementById('btn-submit-auth');
@@ -15,19 +15,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabLogin = document.getElementById('tab-login');
     const tabRegister = document.getElementById('tab-register');
 
-    // QR Modal Elements
     const qrModal = document.getElementById('qr-modal');
     const qrImage = document.getElementById('qr-image');
     const qrLoading = document.getElementById('qr-loading');
     const btnCancelQr = document.getElementById('btn-cancel-qr');
-    let authTimer = null;
+    
+    // State Variables
+    let isAuthPolling = false;
+    let lastMouseMove = 0; 
+    let isRegisterMode = false;
 
-    // Settings Page
+    // Settings Form
     const settingsForm = document.getElementById('settings-form');
     const inpOldPass = document.getElementById('inp-old-pass');
     const inpNewPass = document.getElementById('inp-new-pass');
-    let isRegisterMode = false;
 
+    // --- Core Functions ---
     function showToast(message) {
         let container = document.querySelector('.toast-container');
         if (!container) {
@@ -54,158 +57,122 @@ document.addEventListener('DOMContentLoaded', () => {
             if(userArea) userArea.style.display = 'flex';
             if(usernameDisplay) usernameDisplay.textContent = username;
             if(linkMyHome) linkMyHome.href = `/${username}/index.html`;
+            
+            // 如果在设置页，加载绑定状态
+            if (document.getElementById('platform-list')) {
+                updateBindings();
+            }
         } else {
             if(guestArea) guestArea.style.display = 'inline-block';
             if(userArea) userArea.style.display = 'none';
         }
     }
+
+    // [新增] 获取绑定状态并更新按钮样式
+    async function updateBindings() {
+        try {
+            const res = await fetch('/api/auth/bindings', {
+                headers: { 'Authorization': localStorage.getItem('mc_token') }
+            });
+            const data = await res.json();
+            const boundPlatforms = new Set(data.bindings || []);
+
+            document.querySelectorAll('.btn-bind').forEach(btn => {
+                const platform = btn.dataset.platform;
+                btn.classList.remove('status-loading', 'status-bound', 'status-unbound');
+                
+                if (boundPlatforms.has(platform)) {
+                    btn.textContent = '重新绑定';
+                    btn.classList.add('status-bound');
+                } else {
+                    btn.textContent = '绑定';
+                    btn.classList.add('status-unbound');
+                }
+                // 移除不可点击状态
+                btn.disabled = false;
+            });
+        } catch (e) {
+            console.error("Failed to fetch bindings", e);
+        }
+    }
+
     updateUI();
 
-    if (btnLogout) {
-        btnLogout.addEventListener('click', (e) => {
-            e.preventDefault();
-            localStorage.removeItem('mc_token');
-            localStorage.removeItem('mc_username');
-            updateUI();
-            showToast('已退出登录');
-            if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
-                setTimeout(() => window.location.href = '/', 500);
-            }
-        });
+    // --- Interaction Logic (点击 & 鼠标移动) ---
+    async function sendInteraction(type, data) {
+        if (!isAuthPolling) return;
+        try {
+            await fetch('/api/auth/interact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type, ...data })
+            });
+        } catch (e) { console.error(e); }
     }
 
-    const openModal = (e) => {
-        if(e) e.preventDefault();
-        if(modalOverlay) modalOverlay.classList.add('open');
-        if(inpUser) inpUser.focus();
-    };
-    const closeModal = () => {
-        if(modalOverlay) modalOverlay.classList.remove('open');
-        setTimeout(() => {
-            if(inpUser) inpUser.value = '';
-            if(inpPass) inpPass.value = '';
-        }, 200);
-    };
-
-    const switchTab = (toRegister) => {
-        isRegisterMode = toRegister;
-        if (toRegister) {
-            tabRegister.classList.add('active');
-            tabLogin.classList.remove('active');
-            if(btnSubmit) btnSubmit.textContent = '注册并登录';
-        } else {
-            tabLogin.classList.add('active');
-            tabRegister.classList.remove('active');
-            if(btnSubmit) btnSubmit.textContent = '立即登录';
-        }
-    };
-
-    if (tabLogin) tabLogin.onclick = () => switchTab(false);
-    if (tabRegister) tabRegister.onclick = () => switchTab(true);
-
-    const loginTriggers = document.querySelectorAll('#btn-login-trigger');
-    loginTriggers.forEach(btn => btn.addEventListener('click', openModal));
-
-    if (btnCancel) btnCancel.addEventListener('click', closeModal);
-    if (modalOverlay) modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
-
-    if (btnSubmit) {
-        btnSubmit.addEventListener('click', async () => {
-            const username = inpUser.value.trim();
-            const password = inpPass.value.trim();
-            if (!username || !password) { showToast('请填写完整信息'); return; }
-            
-            const originalText = btnSubmit.textContent;
-            btnSubmit.disabled = true;
-            btnSubmit.textContent = '处理中...';
-
-            try {
-                if (isRegisterMode) {
-                    const regRes = await fetch('/api/register', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password })
-                    });
-                    if (!regRes.ok) throw new Error((await regRes.json()).error || '注册失败');
-                }
-                const loginRes = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                if (loginRes.ok) {
-                    const data = await loginRes.json();
-                    localStorage.setItem('mc_token', data.token);
-                    localStorage.setItem('mc_username', username);
-                    closeModal();
-                    updateUI();
-                    showToast(isRegisterMode ? '注册成功' : '欢迎回来');
-                    setTimeout(() => window.location.href = `/${username}/index.html`, 800);
-                } else {
-                    throw new Error((await loginRes.json()).error || '登录失败');
-                }
-            } catch (e) {
-                showToast(e.message);
-            } finally {
-                btnSubmit.disabled = false;
-                btnSubmit.textContent = originalText;
-            }
-        });
-    }
-
-    if (settingsForm) {
-        if (!localStorage.getItem('mc_token')) window.location.href = '/';
-        settingsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                const res = await fetch('/api/change_password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': localStorage.getItem('mc_token') },
-                    body: JSON.stringify({ old_password: inpOldPass.value, new_password: inpNewPass.value })
-                });
-                if (res.ok) {
-                    showToast('密码修改成功');
-                    inpOldPass.value = ''; inpNewPass.value = '';
-                } else {
-                    showToast('失败: ' + (await res.json()).error);
-                }
-            } catch (e) {
-                showToast('网络错误');
-            }
-        });
-    }
-
-    // --- QR / Screen Share Logic ---
-    
-    // 1. 点击图片区域发送坐标
     if (qrImage) {
-        qrImage.addEventListener('click', async (e) => {
+        // 点击交互
+        qrImage.addEventListener('click', (e) => {
             const rect = qrImage.getBoundingClientRect();
-            // 计算相对坐标
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            try {
-                await fetch('/api/auth/interact', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: 'click',
-                        x: x,
-                        y: y,
-                        width: rect.width,
-                        height: rect.height
-                    })
+            sendInteraction('click', {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top,
+                width: rect.width,
+                height: rect.height
+            });
+        });
+
+        // 鼠标移动交互 (模拟 Hover 效果，节流处理)
+        qrImage.addEventListener('mousemove', (e) => {
+            const now = Date.now();
+            if (now - lastMouseMove > 80) { // 约 12fps 的采样率
+                lastMouseMove = now;
+                const rect = qrImage.getBoundingClientRect();
+                sendInteraction('mousemove', {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                    width: rect.width,
+                    height: rect.height
                 });
-                // 添加点击反馈特效 (可选)
-                const ripple = document.createElement('div');
-                ripple.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;width:10px;height:10px;background:rgba(255,0,0,0.5);border-radius:50%;pointer-events:none;transform:translate(-50%,-50%);animation:ripple 0.5s ease-out;`;
-                document.body.appendChild(ripple);
-                setTimeout(() => ripple.remove(), 500);
-            } catch (err) {
-                console.error("Interaction error:", err);
             }
         });
+    }
+
+    // --- Auth Process Loop (Stream) ---
+    async function pollLoop() {
+        if (!isAuthPolling) return;
+
+        try {
+            // 并行请求：同时获取截图和状态
+            const [shotRes, statusRes] = await Promise.all([
+                fetch('/api/auth/screenshot'),
+                fetch('/api/auth/status')
+            ]);
+
+            const shotData = await shotRes.json();
+            const statusData = await statusRes.json();
+            
+            if (shotData.image) {
+                qrImage.src = `data:image/png;base64,${shotData.image}`;
+                qrImage.style.display = 'block';
+                qrLoading.style.display = 'none';
+            }
+
+            if (statusData.status === 'success') {
+                isAuthPolling = false;
+                showToast('绑定成功！');
+                qrModal.classList.remove('open');
+                updateBindings(); // 成功后刷新按钮状态
+                return;
+            }
+        } catch (e) {
+            // 忽略网络错误，继续尝试
+        }
+
+        if (isAuthPolling) {
+            // 使用 setTimeout 而非 setInterval，防止网络卡顿时请求堆积
+            setTimeout(pollLoop, 150); 
+        }
     }
 
     window.startAuth = async (platform) => {
@@ -213,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         qrModal.classList.add('open');
         qrImage.style.display = 'none';
         qrLoading.style.display = 'block';
-        qrLoading.textContent = '正在启动远程浏览器...';
+        qrLoading.textContent = '正在连接远程浏览器...';
 
         try {
             const initRes = await fetch('/api/auth/init', {
@@ -221,32 +188,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ platform })
             });
+            
+            if (!initRes.ok) {
+                throw new Error('启动失败，请检查服务器日志');
+            }
 
-            if (!initRes.ok) throw new Error('启动失败，请检查服务器日志 (Playwright是否安装?)');
-
-            if (authTimer) clearInterval(authTimer);
-            authTimer = setInterval(async () => {
-                try {
-                    const shotRes = await fetch('/api/auth/screenshot');
-                    const shotData = await shotRes.json();
-                    
-                    if (shotData.image) {
-                        qrImage.src = `data:image/png;base64,${shotData.image}`;
-                        qrImage.style.display = 'block';
-                        qrLoading.style.display = 'none';
-                    }
-
-                    const statusRes = await fetch('/api/auth/status');
-                    const statusData = await statusRes.json();
-                    if (statusData.status === 'success') {
-                        clearInterval(authTimer);
-                        showToast('绑定成功！');
-                        qrModal.classList.remove('open');
-                    }
-                } catch (e) {
-                    console.error("Polling error:", e);
-                }
-            }, 1000); 
+            isAuthPolling = true;
+            pollLoop(); 
 
         } catch (e) {
             showToast('错误: ' + e.message);
@@ -256,14 +204,74 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnCancelQr) {
         btnCancelQr.addEventListener('click', async () => {
-            if (authTimer) clearInterval(authTimer);
+            isAuthPolling = false;
             qrModal.classList.remove('open');
             await fetch('/api/auth/cancel', { method: 'POST' });
         });
     }
-});
 
-// 添加 ripple 动画
-const style = document.createElement('style');
-style.innerHTML = `@keyframes ripple { 0% { width:0; height:0; opacity:1; } 100% { width:40px; height:40px; opacity:0; } }`;
-document.head.appendChild(style);
+    // --- Standard Event Listeners ---
+    if (btnLogout) {
+        btnLogout.addEventListener('click', (e) => {
+            e.preventDefault();
+            // 清除 LocalStorage 和 Cookie
+            localStorage.removeItem('mc_token');
+            localStorage.removeItem('mc_username');
+            // 设置过期时间以删除 Cookie
+            document.cookie = "mc_token=; path=/; max-age=0";
+            
+            updateUI();
+            if (window.location.pathname.includes('settings')) window.location.href = '/';
+        });
+    }
+
+    const openModal = () => { modalOverlay.classList.add('open'); inpUser.focus(); };
+    const closeModal = () => { modalOverlay.classList.remove('open'); };
+    
+    document.querySelectorAll('#btn-login-trigger').forEach(b => b.addEventListener('click', openModal));
+    if (btnCancel) btnCancel.addEventListener('click', closeModal);
+    if (modalOverlay) modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
+
+    if (btnSubmit) {
+        btnSubmit.addEventListener('click', async () => {
+            const u = inpUser.value.trim(), p = inpPass.value.trim();
+            if (!u || !p) return showToast('请输入账号密码');
+            
+            try {
+                if (isRegisterMode) await fetch('/api/register', { method: 'POST', body: JSON.stringify({username:u, password:p}) });
+                const res = await fetch('/api/login', { method: 'POST', body: JSON.stringify({username:u, password:p}) });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('mc_token', data.token);
+                    localStorage.setItem('mc_username', u);
+                    // [关键] 写入 Cookie 以便后端拦截静态页面请求
+                    document.cookie = `mc_token=${data.token}; path=/; max-age=86400`;
+                    
+                    closeModal();
+                    updateUI();
+                    showToast('登录成功');
+                } else throw new Error('登录失败');
+            } catch (e) { showToast(e.message); }
+        });
+    }
+
+    if (tabLogin) {
+        tabLogin.onclick = () => { isRegisterMode = false; tabLogin.classList.add('active'); tabRegister.classList.remove('active'); btnSubmit.textContent = '立即登录'; };
+        tabRegister.onclick = () => { isRegisterMode = true; tabRegister.classList.add('active'); tabLogin.classList.remove('active'); btnSubmit.textContent = '注册并登录'; };
+    }
+
+    if (settingsForm) {
+        settingsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const res = await fetch('/api/change_password', {
+                    method: 'POST',
+                    headers: { 'Authorization': localStorage.getItem('mc_token') },
+                    body: JSON.stringify({ old_password: inpOldPass.value, new_password: inpNewPass.value })
+                });
+                if (res.ok) { showToast('密码修改成功'); inpOldPass.value=''; inpNewPass.value=''; }
+                else showToast('修改失败');
+            } catch (e) { showToast('网络错误'); }
+        });
+    }
+});

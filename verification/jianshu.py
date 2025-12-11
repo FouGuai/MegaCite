@@ -19,7 +19,7 @@ class JianshuVerifier(PlatformVerifier):
         print("[*] Starting Jianshu headless session...")
         self.playwright = sync_playwright().start()
         self.browser = self.playwright.chromium.launch(headless=True)
-        self.context = self.browser.new_context(viewport={'width': 1024, 'height': 768})
+        self.context = self.browser.new_context(viewport={'width': 1280, 'height': 800})
         self.page = self.context.new_page()
         
         try:
@@ -33,29 +33,34 @@ class JianshuVerifier(PlatformVerifier):
     def get_login_screenshot(self) -> str | None:
         if not self._is_session_active or not self.page: return None
         try:
-            png = self.page.screenshot()
+            png = self.page.screenshot(full_page=False)
             return base64.b64encode(png).decode("utf-8")
         except Exception:
             return None
 
     def handle_interaction(self, action: str, payload: dict) -> None:
         if not self._is_session_active or not self.page: return
-        if action == 'click':
-            try:
-                view_size = self.page.viewport_size
-                img_w = payload.get('width', 1)
-                img_h = payload.get('height', 1)
-                target_x = payload.get('x', 0) * (view_size['width'] / img_w)
-                target_y = payload.get('y', 0) * (view_size['height'] / img_h)
+        
+        try:
+            view_size = self.page.viewport_size
+            img_w = payload.get('width', 1)
+            img_h = payload.get('height', 1)
+            target_x = payload.get('x', 0) * (view_size['width'] / img_w)
+            target_y = payload.get('y', 0) * (view_size['height'] / img_h)
+            
+            if action == 'click':
                 self.page.mouse.click(target_x, target_y)
-            except Exception:
-                pass
+            elif action == 'mousemove':
+                self.page.mouse.move(target_x, target_y)
+        except Exception:
+            pass
 
     def check_login_status(self) -> bool:
         if not self._is_session_active or not self.page: return False
         try:
             if "sign_in" not in self.page.url and "jianshu.com" in self.page.url:
                 cookies = self.context.cookies()
+                # 简书登录成功会有较多 cookie，简单判断数量
                 if len(cookies) > 5:
                     save_cookies("jianshu", cookies)
                     return True
