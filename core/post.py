@@ -11,7 +11,7 @@ def _update_url_mapping(conn, cid: str):
     post_dao = MySQLPostDAO(conn)
     owner_id = post_dao.get_field(cid, "owner_id")
     title = post_dao.get_field(cid, "title")
-    catagory = post_dao.get_field(cid, "catagory")
+    category = post_dao.get_field(cid, "category")
     
     if not owner_id: 
         return
@@ -25,7 +25,7 @@ def _update_url_mapping(conn, cid: str):
 
     mgr = URLManager()
     safe_title = mgr.safe_title(title or "untitled")
-    safe_cat = mgr.safe_title(catagory or "default")
+    safe_cat = mgr.safe_title(category or "default")
 
     # 构造新路径结构: /username/category/title.html
     url_path = f"/{username}/{safe_cat}/{safe_title}.html"
@@ -54,7 +54,7 @@ def post_create(token: str) -> str:
     conn = create_connection()
     try:
         dao = MySQLPostDAO(conn)
-        dao.create_post(owner_id=user_id, cid=new_cid, title=default_title, catagory=default_cat, date=None)
+        dao.create_post(owner_id=user_id, cid=new_cid, title=default_title, category=default_cat, date=None)
         
         # 立即更新映射表
         _update_url_mapping(conn, new_cid)
@@ -75,8 +75,8 @@ def post_update(token: str, cid: str, field: str, value: str) -> bool:
             # 捕获违反唯一性约束 (IntegrityError)，即 Category+Title 重复
             return False
         
-        # 只要修改了 title 或 catagory，就需要重新生成 URL
-        if result and field in ("title", "catagory"):
+        # 只要修改了 title 或 category，就需要重新生成 URL
+        if result and field in ("title", "category"):
             _update_url_mapping(conn, cid)
                 
         return result

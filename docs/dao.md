@@ -120,7 +120,7 @@ class PostDAO(ABC):
         Params:
             cid: 文章 CID
             field: 要更新的字段
-                   context / title / date / description / catagory
+                   context / title / date / description / category
             value: 新值（字符串）
         Return:
             True / False
@@ -132,7 +132,7 @@ class PostDAO(ABC):
             获取文章的某个字段。
         Params:
             cid: 文章 CID
-            field: 字段名（context/title/date/description/catagory）
+            field: 字段名（context/title/date/description/category）
         Return:
             Any
         """
@@ -231,7 +231,7 @@ CREATE TABLE posts (
     title TEXT,
     context LONGTEXT,
     description TEXT,
-    catagory VARCHAR(255),
+    category VARCHAR(255),
     date DATE NOT NULL,
     FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 );

@@ -4,19 +4,19 @@ import pymysql.connections
 class MySQLPostDAO:
     """MySQL 实现的 PostDAO。"""
 
-    ALLOWED_FIELDS = {"context", "title", "date", "description", "catagory"}
+    ALLOWED_FIELDS = {"context", "title", "date", "description", "category"}
 
     def __init__(self, conn: pymysql.connections.Connection):
         self.conn = conn
 
-    def create_post(self, owner_id: int, cid: str, title: str, catagory: str = "default", date: str = None) -> None:
+    def create_post(self, owner_id: int, cid: str, title: str, category: str = "default", date: str = None) -> None:
         """创建文章，必须提供 title，category 默认为 default"""
         if date is None:
             date = datetime.now().date()
         with self.conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO posts (cid, owner_id, title, catagory, date) VALUES (%s, %s, %s, %s, %s)",
-                (cid, owner_id, title, catagory, date),
+                "INSERT INTO posts (cid, owner_id, title, category, date) VALUES (%s, %s, %s, %s, %s)",
+                (cid, owner_id, title, category, date),
             )
         self.conn.commit()
 

@@ -227,7 +227,7 @@ $ mc-server status 8080
 - **Params**:
     - `<cid>`: 要更新的文章的内容 ID。
     - `<field>`: 要修改的字段。
-        - **Option**: `context`, `title`, `date`, `description`, `catagory`
+        - **Option**: `context`, `title`, `date`, `description`, `category`
     - `<newvalue>`: 字段的新值 (必须是字符串)。
         - **Option**: `date` 字段必须使用 `YYYY-MM-DD` 格式。
 - **Return**:
@@ -245,7 +245,7 @@ $ mc-server status 8080
 - **Params**:
     - `<cid>`: 要查看的文章的内容 ID。
     - `<field>`: 要查看的字段。
-        - **Option**: `context`, `title`, `date`, `description`, `catagory`
+        - **Option**: `context`, `title`, `date`, `description`, `category`
 - **Return**:
     - `{'Success': '<value>'}`
     - `{'Error': 'Post <cid> not found.'}`

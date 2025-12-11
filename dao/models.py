@@ -15,5 +15,5 @@ class Post:
     title: str | None
     context: str | None
     description: str | None
-    catagory: str | None
+    category: str | None
     date: date

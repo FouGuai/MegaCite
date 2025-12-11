@@ -45,7 +45,7 @@ def main():
     # update
     update_p = post_subs.add_parser("update", help="Update post")
     update_p.add_argument("cid")
-    update_p.add_argument("field", choices=["title", "context", "description", "catagory", "date"])
+    update_p.add_argument("field", choices=["title", "context", "description", "category", "date"])
     update_p.add_argument("value")
     
     # delete
