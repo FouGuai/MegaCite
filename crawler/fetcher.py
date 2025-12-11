@@ -1,17 +1,9 @@
-import time
 import trafilatura
-from curl_cffi import requests # 关键库：能够模拟浏览器底层指纹
+from curl_cffi import requests
 
 def fetch_html(url: str) -> str:
-    """
-    无浏览器环境下的极速抓取方案。
-    1. 获取：使用 curl_cffi 模拟 Chrome 120 的 TLS 指纹，欺骗服务器相信这是真实浏览器。
-    2. 清洗：使用 trafilatura 库提取纯净正文。
-    """
     try:
-        # 使用 curl_cffi 发送请求
-        # impersonate="chrome120": 关键参数，这会让握手包跟真实 Chrome 完全一致
-        # 从而绕过 CSDN 的指纹检测，直接拿到正文，不会触发 nodata
+        # 模拟 Chrome 120 指纹
         resp = requests.get(
             url, 
             impersonate="chrome120", 
@@ -21,7 +13,6 @@ def fetch_html(url: str) -> str:
             timeout=10
         )
         
-        # 检查状态码
         if resp.status_code != 200:
             print(f"[-] HTTP Error: {resp.status_code}")
             return ""
@@ -34,18 +25,18 @@ def fetch_html(url: str) -> str:
 
     # --- 使用 Trafilatura 进行清洗 ---
     try:
-        # extract 是目前最可靠的去除非正文算法
         cleaned_content = trafilatura.extract(
             html_source,
+            include_formatting=True, # <--- 必须开启！保留 b, strong, i, em 等
+            include_links=True,      # <--- 强烈建议开启！保留 a href，否则 Markdown 没链接
+            include_images=False,    # 根据需要决定是否保留 img
+            include_tables=True,     # 保留 table 结构
             include_comments=False,
-            include_tables=True,    # 保留表格
-            include_images=False,   # 仅文本（如需图片改为True）
             no_fallback=False,
-            output_format='html'
+            output_format='html'     # 输出格式保持 html 方便后续正则/LLM处理
         )
         
         if not cleaned_content:
-            # 极少数情况可能因为伪装不够完美导致获取到空内容，或者页面本身无内容
             print("[-] Warning: No content extracted.")
             return ""
             
@@ -57,12 +48,5 @@ def fetch_html(url: str) -> str:
         return ""
 
 if __name__ == '__main__':
-    start = time.time()
-    url = 'https://blog.csdn.net/weixin_38991876/article/details/148174827'
-    
-    print(f"[*] Fetching: {url}")
-    ctx = fetch_html(url)
-    
-    print(f"[*] Total Time: {time.time() - start:.2f}s")
-    print("-" * 50)
-    print(ctx[:500] if ctx else "Empty")
+    ctx = fetch_html('https://www.cnblogs.com/swizard/p/19332596')
+    print(ctx)

@@ -1,1 +1,0 @@
-python -m pytest -v tests/test_cli.py

@@ -3,14 +3,6 @@ from openai import OpenAI
 from core.config import OPENAI_CONFIG
 
 def convert_html_to_markdown(html_source: str) -> dict:
-    """
-    【全能优化版】
-    1. 严格 HTML 映射 (H1-H6)
-    2. 锚点续写 (长文完整性)
-    3. 盘古之白 (中英文自动空格)
-    4. 智能去重 (移除正文开头的重复标题，不限 H1)
-    5. 列表修正 (强制列表前插入空行，修复渲染问题)
-    """
     client = OpenAI(
         api_key=OPENAI_CONFIG["api_key"],
         base_url=OPENAI_CONFIG["base_url"]
@@ -49,41 +41,83 @@ def convert_html_to_markdown(html_source: str) -> dict:
     # 2. 初始指令
     final_chunk = chunks[-1]
     
-    initial_prompt = (
-        "TASK: Convert the HTML content to standard Markdown with PERFECT typography.\n\n"
-        "--- STRICT TAG MAPPING RULES ---\n"
-        "1. **Headings**: `<h1>`-`<h6>` -> `# `-`###### `. Do NOT treat bold text as headers unless wrapped in <h> tags.\n"
-        "2. **Code**: `<pre>`/`<code>` -> Fenced blocks (```language).\n"
-        "3. **Lists (CRITICAL FIX)**: \n"
-        "   - Convert `<ul>` to `- ` and `<ol>` to `1. `.\n"
-        "   - **MANDATORY**: You MUST insert a **BLANK LINE** before the start of any list.\n"
-        "   - **Example**:\n"
-        "     [GOOD]:\n"
-        "     This is a paragraph.\n"
-        "     (Empty Line Here)\n"
-        "     - List item 1\n"
-        "     [BAD]:\n"
-        "     This is a paragraph.\n"
-        "     - List item 1\n"
-        "4. **Basic**: `<b>` -> `**`, `<i>` -> `*`, `<blockquote>` -> `> `.\n"
-        "\n"
-        "--- SPACING RULES (PAN GU ZHI BAI) ---\n"
-        "1. Insert a single space between Chinese and English/Numbers (e.g., `在 C++ 中`).\n"
-        "2. No space inside URLs or code blocks.\n"
-        "\n"
-        "--- REDUNDANCY CONTROL (CRITICAL) ---\n"
-        "1. The `===TITLE===` is rendered separately by the system.\n"
-        "2. **CHECK THE START OF CONTENT**: If the `===CONTENT===` body starts with text that is identical or very similar to the Article Title (regardless of whether it is H1, Bold, or Plain text), **REMOVE IT**.\n"
-        "3. The content should start directly with the introduction text or the first sub-header.\n"
-        "\n"
-        "--- OUTPUT FORMAT ---\n"
-        "1. `===TITLE===` [Article Title]\n"
-        "2. `===SUMMARY===` [One-line Summary]\n"
-        "3. `===CONTENT===` [Markdown Body]\n"
-        "\n"
-        "--- GENERATION ---\n"
-        "Output as much content as possible. Do NOT use `===END===` until the absolute end."
-    )
+    initial_prompt = """
+Role: You are a strict HTML-to-Markdown Compiler. You do NOT "write" content; you compile input code into output code following rigid syntax rules.
+
+--- 1. THE "TWO BLANK LINES" RULE (HIGHEST PRIORITY) ---
+Definition: "Block Element" includes: Paragraphs (<p>), Headers (h1-h6), Lists (ul/ol), Code Blocks (pre), Blockquotes, Tables, and HR.
+
+RULE: Between ANY two Block Elements, you MUST insert strictly **TWO BLANK LINES**.
+(Visually, this looks like a large gap. Technically, it is 3 newline characters `\n\n\n`).
+
+[Example of CORRECT Spacing]:
+Paragraph text ends here.
+(Blank Line 1)
+(Blank Line 2)
+- List item starts here.
+
+[Example of WRONG Spacing]:
+Paragraph text ends here.
+- List item starts here.
+
+--- 2. SYNTAX MAPPING TABLE (STRICT ENUMERATION) ---
+
+Process the input HTML tag by tag using this exact mapping:
+
+**A. BLOCK STRUCTURES (Apply "Two Blank Lines" Rule around these)**
+1. `<h1>` -> `# `
+2. `<h2>` -> `## `
+3. `<h3>` -> `### ` (Scale up to h6)
+   *CONSTRAINT*: Never convert bold text (`<b>`) to headers. Only use `#` if the input is `<h>`.
+4. `<ul>` -> List items use `- ` (hyphen + space).
+5. `<ol>` -> List items use `1. ` (number + dot + space).
+   *NESTING*: Indent nested `<li>` content by 4 spaces.
+6. `<blockquote>` -> `> ` (followed by space).
+7. `<pre><code>` -> Fenced Code Block:
+   ```language
+   code content
+   ````
+8.  `<hr>` -> `---`
+9.  `<table>` -> Convert to Markdown Table `| col | col |`.
+
+**B. INLINE STYLES (Do NOT add newlines around these)**
+
+1.  `<b>` or `<strong>` -> `**content**` (Standard Markdown Bold)
+    *CRITICAL*: No space between `**` and the text.
+    (Good: `**Text**`, Bad: `** Text **`)
+2.  `<i>` or `<em>` -> `*content*` (Italic)
+3.  `<s>` or `<del>` -> `~~content~~` (Strikethrough)
+4.  `<code>` (Inline) -> Backticks: `` `code` ``
+    *Example*: `Use the <code>print()</code> function` -> ` Use the  `print()`  function `.
+5.  `<a href="...">` -> `[Text](URL)`
+6.  `<img src="...">` -> `![Alt](URL)`
+7.  `<br>` -> Insert a single newline `\n`.
+
+--- 3. TEXT PROCESSING (PAN GU ZHI BAI) ---
+
+1.  **Spacing**: Insert exactly ONE space between:
+      - Chinese and English (e.g., `数据 AI` not `数据AI`)
+      - Chinese and Numbers (e.g., `版本 5.0` not `版本5.0`)
+2.  **Exceptions**: DO NOT add spaces inside code blocks, URLs, or between text and punctuation.
+
+--- 4. CONTENT FILTERING (REDUNDANCY CHECK) ---
+
+1.  **Header Check**: Check the text inside the first `===CONTENT===`.
+2.  **Remove**: If the first paragraph/header is a duplicate of the Article Title, DELETE it.
+3.  **Start**: Begin output with the first unique line of content.
+
+--- 5. OUTPUT FORMAT STRUCTURE ---
+output exactly in this format:
+
+===TITLE===
+[Article Title]
+
+===SUMMARY===
+[One sentence summary]
+
+===CONTENT===
+[Markdown Body with PERFECT 2-BLANK-LINE Spacing]
+"""
     
     user_msg_final = (
         f"[Part {total_parts}/{total_parts} of HTML Source]\n"
@@ -93,7 +127,7 @@ def convert_html_to_markdown(html_source: str) -> dict:
     
     messages.append({"role": "user", "content": user_msg_final})
     
-    print(f"[*] Starting Generation (List Fix & Smart Dedup)...")
+    print(f"[*] Starting Generation...")
     
     full_raw_text = ""
     loop_count = 0
