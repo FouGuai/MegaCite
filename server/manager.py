@@ -24,6 +24,7 @@ def server_start(port: int) -> None:
     with open(PID_FILE, "w") as f:
         f.write(str(os.getpid()))
 
+    os.makedirs(WEB_ROOT, exist_ok=True)
     gen = StaticSiteGenerator(WEB_ROOT)
     watcher = DBWatcher(gen)
     

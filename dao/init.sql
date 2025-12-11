@@ -4,6 +4,7 @@ CREATE DATABASE IF NOT EXISTS `megacite` DEFAULT CHARACTER SET = utf8mb4 COLLATE
 USE `megacite`;
 
 -- 为避免重复执行报错，先删除可能已存在的表（按外键依赖顺序）
+DROP TABLE IF EXISTS url_mappings;
 DROP TABLE IF EXISTS post_references;
 DROP TABLE IF EXISTS posts;
 DROP TABLE IF EXISTS auth_platforms;
@@ -29,11 +30,13 @@ CREATE TABLE posts (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     cid VARCHAR(32) UNIQUE NOT NULL,
     owner_id BIGINT NOT NULL,
-    title TEXT,
+    title VARCHAR(255) NOT NULL,
     `context` LONGTEXT,
     description TEXT,
     catagory VARCHAR(255),
     date DATE NOT NULL,
+    -- 确保同一个用户的 title 不重复
+    UNIQUE KEY ux_owner_title (owner_id, title),
     CONSTRAINT fk_post_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -46,12 +49,14 @@ CREATE TABLE post_references (
     CONSTRAINT fk_ref_post FOREIGN KEY (post_cid) REFERENCES posts(cid) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 可选：如果希望引用也关联到 posts 表的 cid 上，
--- 可以在 post_references 上添加另一个外键约束：
--- ALTER TABLE post_references ADD CONSTRAINT fk_ref_to_post FOREIGN KEY (ref_cid) REFERENCES posts(cid) ON DELETE RESTRICT;
+CREATE TABLE url_mappings (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    cid VARCHAR(32) NOT NULL,
+    url_path VARCHAR(255) NOT NULL,
+    UNIQUE KEY ux_cid (cid),
+    UNIQUE KEY ux_url_path (url_path),
+    CONSTRAINT fk_map_cid FOREIGN KEY (cid) REFERENCES posts(cid) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-
--- 改密码
--- ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '114514';
 ALTER USER 'root'@'localhost' IDENTIFIED BY '114514';
 FLUSH PRIVILEGES;

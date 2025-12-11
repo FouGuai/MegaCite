@@ -1,10 +1,11 @@
 import urllib.parse
-import re
+from core.config import SERVER_CONFIG
+from dao.factory import create_connection
+from dao.url_map_dao import MySQLUrlMapDAO
 
 class URLManager:
     """
-    负责路径映射。
-    策略：强制 Slug 化，将空格和特殊字符转换为连字符，确保文件名干净且可读。
+    负责路径映射和 URL 解析。
     """
     _instance = None
     _cid_map: dict[str, str] = {} # cid -> rel_path
@@ -15,24 +16,14 @@ class URLManager:
         return cls._instance
 
     def safe_title(self, title: str) -> str:
-        """
-        生成 URL 安全标题 (Slug)。
-        Example: "Hello World" -> "Hello-World"
-        """
+        """生成 URL 安全标题 (Slug)。"""
         if not title:
             return "untitled"
         
-        # 1. 去除首尾空格
         safe = title.strip()
-        
-        # 2. 将空格、斜杠、反斜杠替换为连字符
         safe = safe.replace(" ", "-").replace("/", "-").replace("\\", "-")
-        
-        # 3. 移除多余的连字符 (e.g. "Hello--World" -> "Hello-World")
         while "--" in safe:
             safe = safe.replace("--", "-")
-            
-        # 4. URL 编码 (处理中文等非 ASCII 字符)
         return urllib.parse.quote(safe)
 
     def register_mapping(self, cid: str, username: str, title: str) -> str:
@@ -43,3 +34,28 @@ class URLManager:
 
     def remove_mapping(self, cid: str) -> str | None:
         return self._cid_map.pop(cid, None)
+
+    def get_cid_from_external_url(self, url: str) -> str | None:
+        """
+        解析外界传入的完整 URL，返回对应的 CID。
+        """
+        try:
+            parsed = urllib.parse.urlparse(url)
+        except ValueError:
+            return None
+        
+        # 1. 验证域名和端口
+        expected_netloc = f"{SERVER_CONFIG['host']}:{SERVER_CONFIG['port']}"
+        if parsed.netloc != expected_netloc:
+            return None
+            
+        # 2. 提取路径 (严格匹配)
+        url_path = parsed.path
+        
+        # 3. 查库
+        conn = create_connection()
+        try:
+            map_dao = MySQLUrlMapDAO(conn)
+            return map_dao.get_cid_by_url(url_path)
+        finally:
+            conn.close()

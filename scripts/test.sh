@@ -19,7 +19,7 @@ CID1=$(python cli.py post create | awk '{print $4}')
 echo "[+] Created Post 1 CID: $CID1"
 
 # 更新元数据
-python cli.py post update $CID1 title "Hello MegaCite"
+# python cli.py post update $CID1 title "Hello MegaCite"
 python cli.py post update $CID1 catagory "Intro"
 python cli.py post update $CID1 description "First blog post"
 # 更新正文 (使用 \n\n 表示换行)

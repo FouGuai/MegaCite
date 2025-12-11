@@ -6,3 +6,8 @@ DB_CONFIG = {
     "database": "megacite",
     "charset": "utf8mb4"
 }
+
+SERVER_CONFIG = {
+    "host": "127.0.0.1",
+    "port": 8080
+}
