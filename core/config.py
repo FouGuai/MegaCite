@@ -17,5 +17,5 @@ SERVER_CONFIG = {
 OPENAI_CONFIG = {
     "api_key": os.getenv("MC_API_KEY"),
     "base_url": "https://api.moonshot.cn/v1",
-    "model": "moonshot-v1-8k"
+    "model": "moonshot-v1-32k"
 }
