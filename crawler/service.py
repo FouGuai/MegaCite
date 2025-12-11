@@ -12,7 +12,14 @@ def migrate_post_from_url(token: str, url: str) -> str:
     # 1. 执行严格的所有权验证 (先于 Token 验证)
     print(f"[*] Verifying ownership for {url}...")
     if not verify_manager.verify_url_owner(url):
-        raise PermissionError("Ownership verification failed. Ensure you are logged in via 'mc auth add' and own this post.")
+        raise PermissionError(
+            "Ownership verification failed.\n"
+            "Possible reasons:\n"
+            "  1. You are not the author of this post.\n"
+            "  2. Your local cookie has expired (Try 'mc auth add <platform>' again).\n"
+            "  3. Network issues or platform anti-bot protection blocked the verification probe.\n"
+            "  4. Page structure changed (Please check logs above)."
+        )
     print(f"[+] Ownership confirmed.")
 
     # 2. 验证系统 Token

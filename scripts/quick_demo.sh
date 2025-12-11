@@ -24,7 +24,7 @@ python cli.py post update $CID2 title "Markdown Features"
 python cli.py post update $CID2 category "Docs"
 python cli.py post update $CID2 context "## List Test\n\n- Feature A\n- Feature B\n\n> Code is poetry."
 
-python cli.py post migrate https://www.cnblogs.com/swizard/p/19332596
+# python cli.py post migrate https://www.cnblogs.com/swizard/p/19332596
 
 echo "[*] Starting Server on port 8080..."
 python cli.py server start 8080
