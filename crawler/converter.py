@@ -42,7 +42,8 @@ def convert_html_to_markdown(html_source: str) -> dict:
     final_chunk = chunks[-1]
     
     initial_prompt = """
-Role: You are a strict HTML-to-Markdown Compiler. You do NOT "write" content; you compile input code into output code following rigid syntax rules.
+Role: You are a **ZERO-TOLERANCE** Strict HTML-to-Markdown Compiler. You do NOT "write" content; you compile input code into output code.
+**WARNING**: Any deviation from the syntax rules below is considered a SYSTEM FAILURE.
 
 --- 1. THE "TWO BLANK LINES" RULE (HIGHEST PRIORITY) ---
 Definition: "Block Element" includes: Paragraphs (<p>), Headers (h1-h6), Lists (ul/ol), Code Blocks (pre), Blockquotes, Tables, and HR.
@@ -54,29 +55,36 @@ RULE: Between ANY two Block Elements, you MUST insert strictly **TWO BLANK LINES
 Paragraph text ends here.
 (Blank Line 1)
 (Blank Line 2)
-- List item starts here.
+
+  - List item starts here.
 
 [Example of WRONG Spacing]:
 Paragraph text ends here.
-- List item starts here.
+
+  - List item starts here.
 
 --- 2. SYNTAX MAPPING TABLE (STRICT ENUMERATION) ---
 
 Process the input HTML tag by tag using this exact mapping:
 
 **A. BLOCK STRUCTURES (Apply "Two Blank Lines" Rule around these)**
-1. `<h1>` -> `# `
-2. `<h2>` -> `## `
-3. `<h3>` -> `### ` (Scale up to h6)
-   *CONSTRAINT*: Never convert bold text (`<b>`) to headers. Only use `#` if the input is `<h>`.
-4. `<ul>` -> List items use `- ` (hyphen + space).
-5. `<ol>` -> List items use `1. ` (number + dot + space).
-   *NESTING*: Indent nested `<li>` content by 4 spaces.
-6. `<blockquote>` -> `> ` (followed by space).
-7. `<pre><code>` -> Fenced Code Block:
-   ```language
-   code content
-   ````
+
+1.  `<h1>` -> ` #  `
+2.  `<h2>` -> ` ##  `
+3.  `<h3>` -> ` ###  ` (Scale up to h6)
+    *CONSTRAINT*: Never convert bold text (`<b>`) to headers. Only use `#` if the input is `<h>`.
+4.  `<ul>` -> List items use ` -  ` (hyphen + space).
+5.  `<ol>` -> List items use ` 1.  ` (number + dot + space).
+    *NESTING*: Indent nested `<li>` content by 4 spaces.
+6.  `<blockquote>` -> ` >  ` (followed by space).
+7.  `<pre><code>` -> Fenced Code Block:
+      * **FATAL ERROR PREVENTION**:
+      * **RULE**: You MUST Output BOTH the opening ` ``` ` AND the closing ` ``` `.
+      * **FORBIDDEN**: Leaving a code block open (e.g., printing the start ` ``` ` without the end ` ``` `).
+      * **Format**:
+        ```language
+        code content
+        ```
 8.  `<hr>` -> `---`
 9.  `<table>` -> Convert to Markdown Table `| col | col |`.
 
@@ -111,12 +119,20 @@ output exactly in this format:
 
 ===TITLE===
 [Article Title]
+**CRITICAL RULE FOR TITLE**: This line must be **PLAIN TEXT ONLY**. strictly **NO** Markdown formatting.
+
+  - **NO** Hash marks (`#`). Even if the source is `<h1>`, strip the tags and output only the text.
+  - **NO** Bolding (`**`) or Italics.
+  - **VIOLATION**: Outputting `# Title` here is strictly prohibited. Output `Title` only.
 
 ===SUMMARY===
 [One sentence summary]
 
 ===CONTENT===
 [Markdown Body with PERFECT 2-BLANK-LINE Spacing]
+
+**FINAL INTEGRITY CHECK**:
+Before finishing, verify that every single Code Block (`<pre>`) has a CLOSING triple-backtick (` ``` `). Unclosed code blocks are unacceptable.
 """
     
     user_msg_final = (
@@ -159,26 +175,29 @@ output exactly in this format:
             
             print(f"    -> Segment {loop_count}: Continuing from anchor...")
             
-            continuation_prompt = (
-                f"I received your output ending with:\n"
-                f"--- BEGIN SNIPPET ---\n"
-                f"{anchor_text}\n"
-                f"--- END SNIPPET ---\n\n"
-                f"**INSTRUCTION**: \n"
-                f"1. Continue converting starting **EXACTLY** after the snippet.\n"
-                f"2. **Strictly enforce List Spacing** (Blank line before lists).\n"
-                f"3. **Strictly enforce Chinese-English Spacing**.\n"
-                f"4. Only output `===END===` when finished."
-            )
-            
+            continuation_prompt = f"""
+I received your output ending with:
+--- BEGIN SNIPPET ---
+{anchor_text}
+--- END SNIPPET ---
+
+**SYSTEM INSTRUCTION**:
+1. **Contextual & Exact Continuity**: Review the conversation history to understand the context. Continue converting/generating **EXACTLY** after the last character of the snippet above. Do not repeat the snippet text itself.
+2. **Code Block Integrity**: Check if the snippet ends inside an open code block.
+   - If the code block should have ended but was cut off, output the closing ` ``` ` immediately.
+   - If the code is incomplete, continue the code logic seamlessly.
+3. **Strictly enforce List Spacing**: Ensure a blank line exists before starting a list.
+4. **Strictly enforce Chinese-English Spacing**: Add space between Hanzi and English/Numbers.
+5. Only output `===END===` when the entire task is completely finished.
+"""            
             messages.append({"role": "user", "content": continuation_prompt})
 
     # 3. 解析结果
     print(f"[*] Stitching complete. Total length: {len(full_raw_text)} chars.")
     
     clean_text = full_raw_text
-    clean_text = re.sub(r"^```(markdown|text)?", "", clean_text, flags=re.IGNORECASE)
-    clean_text = re.sub(r"```$", "", clean_text)
+    # clean_text = re.sub(r"^```(markdown|text)?", "", clean_text, flags=re.IGNORECASE)
+    # clean_text = re.sub(r"```$", "", clean_text)
     
     try:
         title_match = re.search(r"===TITLE===\s*(.*?)\s*(?:===SUMMARY===|$)", clean_text, re.DOTALL)

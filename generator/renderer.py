@@ -10,14 +10,22 @@ class HTMLRenderer:
     def __init__(self):
         self.url_mgr = URLManager()
         
-        # 获取当前文件所在目录
-        base_dir = os.path.dirname(__file__)
-        
-        # 读取模板文件
-        with open(os.path.join(base_dir, "index_template.html"), "r", encoding="utf-8") as f:
-            self.template_index = f.read()
+        # base_dir = os.path.dirname(__file__)
+                
+        # with open(os.path.join(base_dir, "index.html"), "r", encoding="utf-8") as f:
+        #     self.template_index = f.read()
             
-        with open(os.path.join(base_dir, "post_template.html"), "r", encoding="utf-8") as f:
+        # with open(os.path.join(base_dir, "post.html"), "r", encoding="utf-8") as f:
+        #     self.template_post = f.read()
+
+        current_dir = os.path.dirname(__file__)
+        project_root = os.path.dirname(current_dir)
+        template_dir = os.path.join(project_root, "templates")
+
+        with open(os.path.join(template_dir, "index.html"), "r", encoding="utf-8") as f:
+            self.template_index = f.read()
+    
+        with open(os.path.join(template_dir, "post.html"), "r", encoding="utf-8") as f:
             self.template_post = f.read()
 
     def render_user_index(self, username: str, categorized_posts: dict) -> str:
@@ -26,7 +34,6 @@ class HTMLRenderer:
             posts = categorized_posts[category]
             items = []
             for p in posts:
-                # 修改：在链接前添加日期 span
                 items.append(f'<li><span class="post-date">{p["date"]}</span><a href="{p["filename"]}">{p["title"]}</a></li>')
             list_html = "\n".join(items) if items else "<li class='empty'>No posts.</li>"
             parts.append(f'<section class="category-section"><h2>{category}</h2><ul class="post-list">{list_html}</ul></section>')
@@ -37,7 +44,16 @@ class HTMLRenderer:
         )
 
     def render_post(self, post_data: dict, author_name: str, cid: str) -> str:
+        
         raw_content = str(post_data.get("context", "") or "")
+        
+        desc_text = post_data.get("description", "")
+        
+        if desc_text and desc_text.strip():
+            description_html = f'<blockquote class="description">{desc_text}</blockquote>'
+        else:
+            description_html = ""
+        
         found_refs = set()
 
         def processor_callback(old_str, new_str, target_cid):
@@ -59,5 +75,6 @@ class HTMLRenderer:
             author=author_name,
             category=post_data.get("category", "default") or "default",
             cid=cid,
-            content=content
+            content=content,
+            description_block=description_html
         )

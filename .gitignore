@@ -209,6 +209,9 @@ __marimo__/
 
 uv.lock
 
+# Smart ♂ Ass
+.DS_Store
+
 # MegaCite
 public/
 .pytest_cache/

@@ -19,8 +19,10 @@ class StaticSiteGenerator:
         if not os.path.exists(self.base_dir):
             os.makedirs(self.base_dir)
             
-        # 从 generator 目录复制 style.css 到 public 目录
-        src_css = os.path.join(os.path.dirname(__file__), "style.css")
+        # src_css = os.path.join(os.path.dirname(__file__), "style.css")
+        current_dir = os.path.dirname(__file__)
+        project_root = os.path.dirname(current_dir)
+        src_css = os.path.join(project_root, "templates", "style.css")
         dst_css = os.path.join(self.base_dir, "style.css")
         
         if os.path.exists(src_css):
