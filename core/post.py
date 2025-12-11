@@ -1,7 +1,7 @@
 from typing import Any
 from dao import MySQLPostDAO
 from dao.factory import create_connection
-from logic.auth import verify_token
+from core.auth import verify_token
 from core.security import generate_cid
 
 def post_list(token: str, count: int | None = None) -> list[str]:

@@ -1,7 +1,7 @@
 import argparse
 import sys
+from core import auth, post
 from server import manager as server_manager
-from logic import auth, post
 from client import store
 
 def main():
