@@ -3,7 +3,9 @@ import sys
 from core import auth, post
 from server import manager as server_manager
 from client import store
-import crawler 
+import crawler
+# 新增验证模块
+from verification import manager as verify_manager
 
 def main():
     parser = argparse.ArgumentParser(description="MegaCite CLI Tool")
@@ -19,50 +21,47 @@ def main():
     user_parser = subparsers.add_parser("user", help="User management")
     user_subs = user_parser.add_subparsers(dest="action", required=True)
     
-    # Register: mc register <username> <password>
     reg_parser = user_subs.add_parser("register", help="Register a new user")
     reg_parser.add_argument("username", help="Username")
     reg_parser.add_argument("password", help="Password")
 
-    # Login: mc login <username> <password>
     login_parser = user_subs.add_parser("login", help="Login to system")
     login_parser.add_argument("username", help="Username")
     login_parser.add_argument("password", help="Password")
 
-    # Logout
     user_subs.add_parser("logout", help="Logout from system")
+
+    # --- auth (New) ---
+    auth_parser = subparsers.add_parser("auth", help="External platform authentication")
+    auth_subs = auth_parser.add_subparsers(dest="action", required=True)
+
+    auth_add = auth_subs.add_parser("add", help="Add platform authentication")
+    auth_add.add_argument("platform", help="Platform name (e.g., csdn)")
 
     # --- post ---
     post_parser = subparsers.add_parser("post", help="Post management")
     post_subs = post_parser.add_subparsers(dest="action", required=True)
     
-    # list
     list_p = post_subs.add_parser("list", help="List posts")
     list_p.add_argument("count", nargs="?", type=int, default=None)
     
-    # create
     post_subs.add_parser("create", help="Create a post")
     
-    # update
     update_p = post_subs.add_parser("update", help="Update post")
     update_p.add_argument("cid")
     update_p.add_argument("field", choices=["title", "context", "description", "category", "date"])
     update_p.add_argument("value")
     
-    # delete
     delete_p = post_subs.add_parser("delete", help="Delete post")
     delete_p.add_argument("cid")
     
-    # get
     get_p = post_subs.add_parser("get", help="Get field")
     get_p.add_argument("cid")
     get_p.add_argument("field")
     
-    # search
     search_p = post_subs.add_parser("search", help="Search")
     search_p.add_argument("keyword")
 
-    # migrate
     migrate_p = post_subs.add_parser("migrate", help="Migrate post from URL")
     migrate_p.add_argument("url")
 
@@ -84,6 +83,11 @@ def main():
             elif args.action == "logout":
                 store.clear_local_token()
                 print("Logged out.")
+
+        # 处理 Auth 命令
+        elif args.command == "auth":
+            if args.action == "add":
+                verify_manager.login_platform(args.platform)
 
         elif args.command == "post":
             token = store.load_local_token()
@@ -112,10 +116,11 @@ def main():
 
             elif args.action == "migrate":
                 cid = crawler.migrate_post_from_url(token, args.url)
-                print(f"Migration successful. CID: {cid}")
+                if cid:
+                    print(f"Migration successful. CID: {cid}")
 
-    except PermissionError:
-        print("Error: Please login first.")
+    except PermissionError as e:
+        print(f"Permission Denied: {e}")
     except Exception as e:
         print(f"Error: {e}")
 

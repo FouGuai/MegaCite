@@ -2,28 +2,37 @@ from datetime import date
 from core.auth import verify_token
 from core.post import post_create, post_update
 from crawler.fetcher import fetch_html
-# [修改点]：从新的 converter 模块导入
 from crawler.converter import convert_html_to_markdown
+# 引入验证管理器
+from verification import manager as verify_manager
 
 def migrate_post_from_url(token: str, url: str) -> str:
-    """执行迁移：下载 -> 转换 -> 入库"""
-    # 1. 验证权限
+    """执行迁移：验证 -> 下载 -> 转换 -> 入库"""
+    
+    # 1. 执行严格的所有权验证 (先于 Token 验证)
+    print(f"[*] Verifying ownership for {url}...")
+    if not verify_manager.verify_url_owner(url):
+        raise PermissionError("Ownership verification failed. Ensure you are logged in via 'mc auth add' and own this post.")
+    print(f"[+] Ownership confirmed.")
+
+    # 2. 验证系统 Token
     verify_token(token)
 
-    # 2. 获取源码
+    # 3. 获取源码
     print(f"[*] Fetching {url}...")
     html = fetch_html(url)
+    if not html:
+        raise ValueError("Failed to fetch content.")
 
-    # 3. AI 转换
+    # 4. AI 转换
     print(f"[*] Analyzing with AI...")
     data = convert_html_to_markdown(html)
 
-    # 4. 创建文章
+    # 5. 创建文章
     cid = post_create(token)
     
-    # 5. 更新字段
+    # 6. 更新字段
     try:
-        # 现在 data 字典由 converter.py 保证包含这些键
         title = data.get("title", f"Imported-{cid}")
         cat = "Imported"
         desc = data.get("description", "Imported from URL")
