@@ -2,9 +2,11 @@ import socketserver
 import http.server
 import os
 import threading
+import json
 from generator.builder import StaticSiteGenerator
 from generator.watcher import DBWatcher
 from dao.factory import create_connection
+from core.auth import user_login
 
 PID_FILE = "server.pid"
 WEB_ROOT = "public"
@@ -41,6 +43,28 @@ def server_start(port: int) -> None:
         
         def log_message(self, format, *args):
             pass
+
+        def do_POST(self):
+            if self.path == '/api/login':
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length)
+                try:
+                    data = json.loads(body)
+                    username = data.get('username')
+                    password = data.get('password')
+                    token = user_login(username, password)
+                    
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'token': token}).encode())
+                except Exception as e:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({'error': str(e)}).encode())
+            else:
+                self.send_error(404, "Not Found")
 
     print(f"[+] Server started on port {port}.")
     print(f"[+] Root: {abs_root}")

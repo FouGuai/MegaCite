@@ -9,7 +9,7 @@ def fetch_html(url: str) -> str:
     # 针对语雀 (Yuque) 的特殊处理：SPA 动态渲染 + 权限控制 + 专用清洗
     if "yuque.com" in url:
         return _fetch_dynamic(url, "yuque")
-        
+    
     # 其他默认静态抓取
     return _fetch_static(url)
 

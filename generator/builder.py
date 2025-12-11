@@ -6,10 +6,6 @@ from generator.renderer import HTMLRenderer
 from dao.factory import create_connection
 
 class StaticSiteGenerator:
-    """
-    生成静态文件到 public/ 目录。
-    """
-    
     def __init__(self, base_dir="public"):
         self.base_dir = base_dir
         self.url_mgr = URLManager()
@@ -19,36 +15,39 @@ class StaticSiteGenerator:
         if not os.path.exists(self.base_dir):
             os.makedirs(self.base_dir)
             
-        # src_css = os.path.join(os.path.dirname(__file__), "style.css")
         current_dir = os.path.dirname(__file__)
         project_root = os.path.dirname(current_dir)
-        src_css = os.path.join(project_root, "templates", "style.css")
-        dst_css = os.path.join(self.base_dir, "style.css")
+        assets_dir = os.path.join(project_root, "assets")
         
-        if os.path.exists(src_css):
-            shutil.copy(src_css, dst_css)
+        if os.path.exists(assets_dir):
+            try:
+                shutil.copytree(assets_dir, self.base_dir, dirs_exist_ok=True)
+                print(f"[Gen] Assets copied from {assets_dir}")
+            except Exception as e:
+                print(f"[Gen] Error copying assets: {e}")
         else:
-            print(f"[Warning] Source CSS not found: {src_css}")
+            print(f"[Warning] Assets directory not found: {assets_dir}")
+
+        self.sync_landing_page()
+
+    def sync_landing_page(self):
+        html = self.renderer.render_landing_page()
+        path = self._get_abs_path("index.html")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(html)
+        print(f"[Gen] Landing Page generated: {path}")
 
     def _get_abs_path(self, rel_path: str) -> str:
         return os.path.join(self.base_dir, rel_path)
 
     def remove_post_file_by_meta(self, username: str, category: str, title: str):
-        """
-        [新增] 根据元数据计算旧路径并删除文件。
-        用于在 URL 结构变更（重命名/移动分类）时清理旧文件。
-        """
         s_cat = self.url_mgr.safe_title(category or "default")
         s_title = self.url_mgr.safe_title(title or "untitled")
-        # 路径结构必须与 register_mapping 保持一致
         rel_prefix = f"{username}/{s_cat}/{s_title}"
         full_path = self._get_abs_path(rel_prefix + ".html")
         
         if os.path.exists(full_path):
             os.remove(full_path)
-            print(f"[Gen] Cleaned old file: {full_path}")
-            
-            # 尝试清理空目录，保持目录整洁
             try:
                 parent_dir = os.path.dirname(full_path)
                 if not os.listdir(parent_dir):
@@ -83,7 +82,6 @@ class StaticSiteGenerator:
                 username = row[0]
 
             with conn.cursor() as cur:
-                # 修改：增加了 date 字段的查询，且保持 ORDER BY date DESC
                 cur.execute("SELECT cid, title, category, date FROM posts WHERE owner_id=%s ORDER BY date DESC", (user_id,))
                 rows = cur.fetchall()
 
@@ -91,16 +89,15 @@ class StaticSiteGenerator:
             for r in rows:
                 p_cid, p_title = r[0], r[1] or "untitled"
                 p_cat = r[2] or "default"
-                p_date = r[3] # 获取日期
+                p_date = r[3]
                 
                 rel_prefix = self.url_mgr.register_mapping(p_cid, username, p_cat, p_title)
-                
                 link_href = f"{self.url_mgr.safe_title(p_cat)}/{os.path.basename(rel_prefix)}.html"
                 
                 categorized[p_cat].append({
                     "title": p_title, 
                     "filename": link_href,
-                    "date": str(p_date) # 存入日期
+                    "date": str(p_date)
                 })
             
             html = self.renderer.render_user_index(username, categorized)

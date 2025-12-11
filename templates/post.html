@@ -1,34 +1,90 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title}</title>
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="/style.css" rel="stylesheet">
 </head>
-<body>
-    <div class="container">
-        <header class="post-header">
-            <h1>{title}</h1>
-            <div class="meta">
-                <span class="author">{author}</span>
-                <span class="sep">&bull;</span>
-                <span class="date">{date}</span>
-                <span class="sep">&bull;</span>
-                <span class="category">{category}</span>
-                <span class="sep">&bull;</span>
-                <span class="cid">CID: {cid}</span>
+<body class="white">
+
+    <div class="navbar-fixed">
+        <nav>
+            <div class="nav-wrapper container">
+                <a href="/" class="brand-logo left">
+                    <img src="/logo.svg" alt="M" class="mc-logo">
+                    MegaCite
+                </a>
+                <ul class="right">
+                    <li id="auth-guest">
+                        <a href="#login-modal" class="btn blue darken-2 waves-effect waves-light auth-btn modal-trigger">登录</a>
+                    </li>
+                    <li id="auth-user" class="hide">
+                        <a href="#" id="btn-logout" class="grey-text text-darken-1 tooltipped" data-position="bottom" data-tooltip="退出登录">
+                            <i class="material-icons left">exit_to_app</i>
+                        </a>
+                    </li>
+                </ul>
             </div>
-            {description_block}
-        </header>
-        <article class="post-content">
-            {content}
-        </article>
-        <footer>
-            <div class="footer-nav">
-                <a href="../index.html" class="back-link">&larr; Back to Menu</a>
-            </div>
-        </footer>
+        </nav>
     </div>
+
+    <div class="container main-container">
+        <div class="row">
+            <div class="col s12 m10 offset-m1 l8 offset-l2">
+                
+                <header class="center-align" style="margin-bottom: 40px;">
+                    <h1 class="black-text" style="font-weight: 800; margin-bottom: 20px;">{title}</h1>
+                    <div class="valign-wrapper justify-content-center grey-text text-darken-1">
+                        <i class="material-icons tiny left">person</i>{author}
+                        <span style="margin: 0 10px;">•</span>
+                        {date}
+                        <span style="margin: 0 10px;">•</span>
+                        <span class="blue-text">{category}</span>
+                    </div>
+                    {description_block}
+                </header>
+
+                <article class="post-content flow-text">
+                    {content}
+                </article>
+
+                <div class="divider" style="margin: 50px 0;"></div>
+                
+                <div class="center-align">
+                    <a href="../index.html" class="btn-flat waves-effect">
+                        <i class="material-icons left">arrow_back</i>返回列表
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal" style="max-width: 380px; border-radius: 8px;">
+        <div class="modal-content center-align">
+            <h5 class="bold" style="margin-bottom: 30px;">管理员登录</h5>
+            <div class="input-field left-align">
+                <i class="material-icons prefix">person_outline</i>
+                <input id="inp-username" type="text">
+                <label for="inp-username">用户名</label>
+            </div>
+            <div class="input-field left-align">
+                <i class="material-icons prefix">lock_outline</i>
+                <input id="inp-password" type="password">
+                <label for="inp-password">密码</label>
+            </div>
+        </div>
+        <div class="modal-footer" style="padding-right: 24px;">
+            <a href="#!" class="modal-close waves-effect btn-flat">取消</a>
+            <a href="#!" id="btn-submit-login" class="waves-effect waves-light btn blue darken-2" style="border-radius: 18px;">确认</a>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script src="/app.js"></script>
 </body>
 </html>

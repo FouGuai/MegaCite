@@ -3,13 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{username} 的博客</title>
+    <title>MegaCite - Knowledge Hub</title>
+    <!-- Materialize CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link href="/style.css" rel="stylesheet">
 </head>
 <body>
     
+    <!-- Navbar -->
     <div class="navbar-fixed">
         <nav>
             <div class="nav-wrapper container">
@@ -17,10 +19,14 @@
                     <img src="/logo.svg" alt="M" class="mc-logo">
                     MegaCite
                 </a>
+                
+                <!-- Right Auth Controls -->
                 <ul class="right">
+                    <!-- Guest View -->
                     <li id="auth-guest">
                         <a href="#login-modal" class="btn blue darken-2 waves-effect waves-light auth-btn modal-trigger">登录</a>
                     </li>
+                    <!-- User View -->
                     <li id="auth-user" class="hide">
                         <a href="#" id="btn-logout" class="grey-text text-darken-1 tooltipped" data-position="bottom" data-tooltip="退出登录">
                             <i class="material-icons left">exit_to_app</i>
@@ -31,28 +37,45 @@
         </nav>
     </div>
 
+    <!-- Hero Section -->
     <div class="container main-container">
+        <div class="hero-header">
+            <h1>构建你的数字花园</h1>
+            <p class="flow-text grey-text text-darken-1">
+                现代化、轻量级的静态内容管理系统。<br>
+                专注于内容的创作与沉淀，而非繁琐的部署。
+            </p>
+            <div style="margin-top: 40px;">
+                <a href="https://github.com/yharim-io/megacite" target="_blank" class="btn-large white black-text waves-effect z-depth-1" style="border: 1px solid #ddd;">
+                    <i class="material-icons left">code</i>GitHub
+                </a>
+            </div>
+        </div>
+
         <div class="row">
-            <div class="col s12 m10 offset-m1">
-                
-                <!-- Header -->
-                <div style="margin-bottom: 40px;">
-                    <h2 class="bold" style="margin-bottom: 10px;">{username}</h2>
-                    <p class="grey-text text-darken-1">文章归档</p>
+            <div class="col s12 m4">
+                <div class="feature-card">
+                    <i class="material-icons feature-icon">import_contacts</i>
+                    <h5>无缝迁移</h5>
+                    <p class="grey-text">一键从 CSDN、简书等主流平台导入文章，保留原始格式与元数据。</p>
                 </div>
-
-                <!-- Content Area -->
-                {content}
-
+            </div>
+            <div class="col s12 m4">
+                <div class="feature-card">
+                    <i class="material-icons feature-icon">bolt</i>
+                    <h5>极速静态</h5>
+                    <p class="grey-text">生成纯静态 HTML 页面，部署简单，加载速度极快，无需数据库维护。</p>
+                </div>
+            </div>
+            <div class="col s12 m4">
+                <div class="feature-card">
+                    <i class="material-icons feature-icon">auto_fix_high</i>
+                    <h5>AI 赋能</h5>
+                    <p class="grey-text">利用 AI 技术自动优化 Markdown 格式，智能生成摘要与元数据。</p>
+                </div>
             </div>
         </div>
     </div>
-
-    <footer class="page-footer white">
-        <div class="container center-align">
-            <p class="grey-text text-lighten-1">&copy; 2025 MegaCite</p>
-        </div>
-    </footer>
 
     <!-- Login Modal -->
     <div id="login-modal" class="modal" style="max-width: 380px; border-radius: 8px;">
