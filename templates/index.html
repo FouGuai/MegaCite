@@ -3,79 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{username} 的博客</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <title>{username} - Articles</title>
     <link href="/style.css" rel="stylesheet">
 </head>
 <body>
-    
-    <div class="navbar-fixed">
-        <nav>
-            <div class="nav-wrapper container">
-                <a href="/" class="brand-logo left">
-                    <img src="/logo.svg" alt="M" class="mc-logo">
-                    MegaCite
+    <div class="layout">
+        <!-- Navbar -->
+        <header class="VPNav">
+            <div class="VPNavBar">
+                <a href="/" class="title-container">
+                    <img src="/logo.svg" alt="Logo" class="logo">
+                    <span class="site-title">MegaCite</span>
                 </a>
-                <ul class="right">
-                    <li id="auth-guest">
-                        <a href="#login-modal" class="btn blue darken-2 waves-effect waves-light auth-btn modal-trigger">登录</a>
-                    </li>
-                    <li id="auth-user" class="hide">
-                        <a href="#" id="btn-logout" class="grey-text text-darken-1 tooltipped" data-position="bottom" data-tooltip="退出登录">
-                            <i class="material-icons left">exit_to_app</i>
-                        </a>
-                    </li>
-                </ul>
+                <nav class="nav-group">
+                    <span id="auth-guest">
+                        <span class="nav-link" id="btn-login-trigger">登录 / 注册</span>
+                    </span>
+                    <span id="auth-user" style="display:none; gap: 24px; align-items: center;">
+                        <a href="#" id="link-my-home" class="nav-link">我的主页</a>
+                        <a href="/settings.html" class="nav-link">设置</a>
+                        <span id="username-display" class="nav-text"></span>
+                        <a href="#" id="btn-logout" class="nav-link">退出</a>
+                    </span>
+                </nav>
             </div>
-        </nav>
+        </header>
+
+        <main class="container">
+            <div style="margin-bottom: 64px;">
+                <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">{username}</h1>
+                <p style="color: var(--vp-c-text-2); font-size: 16px;">个人知识库归档</p>
+            </div>
+            
+            <!-- 这里的 {content} 虽然包含 Materialize 的类名 -->
+            <!-- 但 assets/style.css 已经针对这些类名做了彻底的样式重写 -->
+            {content}
+        </main>
+
+        <footer class="VPFooter">
+            © 2025 MegaCite. Powered by StaticSiteGenerator.
+        </footer>
     </div>
 
-    <div class="container main-container">
-        <div class="row">
-            <div class="col s12 m10 offset-m1">
-                
-                <!-- Header -->
-                <div style="margin-bottom: 40px;">
-                    <h2 class="bold" style="margin-bottom: 10px;">{username}</h2>
-                    <p class="grey-text text-darken-1">文章归档</p>
-                </div>
-
-                <!-- Content Area -->
-                {content}
-
+    <!-- Auth Modal -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-tabs">
+                <div class="modal-tab active" id="tab-login">登录</div>
+                <div class="modal-tab" id="tab-register">注册</div>
             </div>
-        </div>
-    </div>
-
-    <footer class="page-footer white">
-        <div class="container center-align">
-            <p class="grey-text text-lighten-1">&copy; 2025 MegaCite</p>
-        </div>
-    </footer>
-
-    <!-- Login Modal -->
-    <div id="login-modal" class="modal" style="max-width: 380px; border-radius: 8px;">
-        <div class="modal-content center-align">
-            <h5 class="bold" style="margin-bottom: 30px;">管理员登录</h5>
-            <div class="input-field left-align">
-                <i class="material-icons prefix">person_outline</i>
-                <input id="inp-username" type="text">
-                <label for="inp-username">用户名</label>
+            <div class="modal-inner">
+                <input id="inp-username" type="text" class="form-input" placeholder="用户名">
+                <input id="inp-password" type="password" class="form-input" placeholder="密码">
+                <button id="btn-submit-auth" class="btn-submit">登录</button>
+                <span id="btn-cancel-login" class="btn-cancel">取消</span>
             </div>
-            <div class="input-field left-align">
-                <i class="material-icons prefix">lock_outline</i>
-                <input id="inp-password" type="password">
-                <label for="inp-password">密码</label>
-            </div>
-        </div>
-        <div class="modal-footer" style="padding-right: 24px;">
-            <a href="#!" class="modal-close waves-effect btn-flat">取消</a>
-            <a href="#!" id="btn-submit-login" class="waves-effect waves-light btn blue darken-2" style="border-radius: 18px;">确认</a>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <script src="/app.js"></script>
 </body>
 </html>

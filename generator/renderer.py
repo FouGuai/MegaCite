@@ -5,7 +5,7 @@ from generator.markdown_extensions import CiteReferenceExtension
 from generator.content_updater import update_post_content_in_db, update_post_references_in_db
 
 class HTMLRenderer:
-    """渲染 HTML 内容"""
+    """渲染 HTML 内容 - VitePress 风格"""
 
     def __init__(self):
         self.url_mgr = URLManager()
@@ -27,8 +27,32 @@ class HTMLRenderer:
         else:
             self.template_home = "<h1>Welcome</h1>"
 
+        settings_path = os.path.join(template_dir, "settings.html")
+        if os.path.exists(settings_path):
+            with open(settings_path, "r", encoding="utf-8") as f:
+                self.template_settings = f.read()
+        else:
+            self.template_settings = "<h1>Settings</h1>"
+
     def render_landing_page(self) -> str:
         return self.template_home
+
+    def render_settings_page(self) -> str:
+        return self.template_settings
+        
+    def render_admin_stub(self) -> str:
+        # 简单的 Admin 占位页，实际应该是个独立应用或模板
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><title>Admin Dashboard</title><link href="/style.css" rel="stylesheet"></head>
+        <body style="padding: 40px; text-align:center;">
+            <h1>Admin Dashboard</h1>
+            <p>Welcome, Admin.</p>
+            <a href="/" class="action-btn brand">Back Home</a>
+        </body>
+        </html>
+        """
 
     def render_user_index(self, username: str, categorized_posts: dict) -> str:
         parts = []
@@ -36,26 +60,26 @@ class HTMLRenderer:
             posts = categorized_posts[category]
             items = []
             for p in posts:
-                # 使用 Materialize 的 Collection 样式
                 item_html = f"""
-                <a href="{p['filename']}" class="collection-item avatar waves-effect">
-                    <i class="material-icons circle blue lighten-3">article</i>
-                    <span class="title black-text fw-500">{p['title']}</span>
-                    <p class="grey-text small-text">{p['date']}</p>
-                    <i class="material-icons secondary-content grey-text">arrow_forward</i>
+                <a href="{p['filename']}" class="post-item">
+                    <div class="post-item-title">{p['title']}</div>
+                    <div class="post-item-meta">
+                        <span>{p['date']}</span>
+                        <span>Read more →</span>
+                    </div>
                 </a>
                 """
                 items.append(item_html)
             
-            list_html = "\n".join(items) if items else "<div class='p-3 grey-text'>暂无内容</div>"
+            list_html = "\n".join(items) if items else "<div class='grey-text'>暂无内容</div>"
             
-            # 分类块
             section_html = f"""
             <div class="section">
-                <h5 class="category-title blue-text text-darken-2">
-                    <i class="material-icons left">folder</i>{category}
-                </h5>
-                <div class="collection z-depth-1 hoverable border-radius-8">
+                <h3 class="post-section-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-folder"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    {category}
+                </h3>
+                <div class="post-list">
                     {list_html}
                 </div>
             </div>
@@ -64,7 +88,7 @@ class HTMLRenderer:
         
         return self.template_index.format(
             username=username,
-            content="\n".join(parts) or "<p class='center-align flow-text grey-text'>空空如也</p>"
+            content="\n".join(parts) or "<p style='text-align:center;color:var(--vp-c-text-3)'>空空如也</p>"
         )
 
     def render_post(self, post_data: dict, author_name: str, cid: str) -> str:
@@ -72,13 +96,11 @@ class HTMLRenderer:
         raw_content = str(post_data.get("context", "") or "")
         desc_text = post_data.get("description", "")
         
-        # 描述块改为 Materialize 的 info card
         if desc_text and desc_text.strip():
             description_html = f"""
-            <div class="card-panel blue lighten-5 z-depth-0">
-                <span class="blue-text text-darken-3">
-                    <i class="material-icons left tiny">info_outline</i>{desc_text}
-                </span>
+            <div class="custom-block info">
+                <p class="custom-block-title">摘要</p>
+                <p>{desc_text}</p>
             </div>
             """
         else:
@@ -92,7 +114,7 @@ class HTMLRenderer:
                 update_post_content_in_db(cid, old_str, new_str)
 
         md = markdown.Markdown(extensions=[
-            'fenced_code', 'tables',
+            'fenced_code', 'tables', 'toc',
             CiteReferenceExtension(url_mgr=self.url_mgr, db_callback=processor_callback)
         ])
         content = md.convert(raw_content)

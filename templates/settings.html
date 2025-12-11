@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户设置</title>
+    <link href="/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="layout">
+        <header class="VPNav">
+            <div class="VPNavBar">
+                <a href="/" class="title-container">
+                    <img src="/logo.svg" alt="Logo" class="logo">
+                    <span class="site-title">MegaCite</span>
+                </a>
+                <nav class="nav-group">
+                    <span id="auth-guest">
+                        <span class="nav-link" id="btn-login-trigger">登录 / 注册</span>
+                    </span>
+                    <span id="auth-user" style="display:none; gap: 24px; align-items: center;">
+                        <a href="#" id="link-my-home" class="nav-link">我的主页</a>
+                        <span class="nav-link active" style="color: var(--vp-c-brand);">设置</span>
+                        <span id="username-display" class="nav-text"></span>
+                        <a href="#" id="btn-logout" class="nav-link">退出</a>
+                    </span>
+                </nav>
+            </div>
+        </header>
+
+        <main class="container-narrow">
+            <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 32px; letter-spacing: -0.02em;">用户设置</h1>
+            
+            <div class="card-panel" style="background: rgba(52,81,178,0.05); padding: 20px; border-radius: 8px; color: var(--vp-c-text-1);">
+                <p style="font-weight: 600; margin-bottom: 8px; color: var(--vp-c-brand); font-size: 13px; text-transform: uppercase;">安全中心</p>
+                <p style="margin: 0; font-size: 15px;">在此处更新您的账户密码。</p>
+            </div>
+
+            <form id="settings-form" style="max-width: 420px; margin-top: 48px;">
+                <h2 style="font-size: 20px; font-weight: 600; margin-bottom: 24px;">修改密码</h2>
+                
+                <input id="inp-old-pass" type="password" class="form-input" placeholder="旧密码">
+                <input id="inp-new-pass" type="password" class="form-input" placeholder="新密码">
+                
+                <button type="submit" class="btn-submit" style="margin-top: 12px;">
+                    确认修改
+                </button>
+            </form>
+        </main>
+
+        <footer class="VPFooter">
+            © 2025 MegaCite.
+        </footer>
+    </div>
+    
+    <script src="/app.js"></script>
+</body>
+</html>

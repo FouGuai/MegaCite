@@ -3,102 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MegaCite - Knowledge Hub</title>
-    <!-- Materialize CSS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <title>MegaCite</title>
     <link href="/style.css" rel="stylesheet">
 </head>
 <body>
-    
-    <!-- Navbar -->
-    <div class="navbar-fixed">
-        <nav>
-            <div class="nav-wrapper container">
-                <a href="/" class="brand-logo left">
-                    <img src="/logo.svg" alt="M" class="mc-logo">
-                    MegaCite
+    <div class="layout">
+        <!-- Navbar -->
+        <header class="VPNav">
+            <div class="VPNavBar">
+                <a href="/" class="title-container">
+                    <img src="/logo.svg" alt="Logo" class="logo">
+                    <span class="site-title">MegaCite</span>
                 </a>
-                
-                <!-- Right Auth Controls -->
-                <ul class="right">
-                    <!-- Guest View -->
-                    <li id="auth-guest">
-                        <a href="#login-modal" class="btn blue darken-2 waves-effect waves-light auth-btn modal-trigger">登录</a>
-                    </li>
-                    <!-- User View -->
-                    <li id="auth-user" class="hide">
-                        <a href="#" id="btn-logout" class="grey-text text-darken-1 tooltipped" data-position="bottom" data-tooltip="退出登录">
-                            <i class="material-icons left">exit_to_app</i>
-                        </a>
-                    </li>
-                </ul>
+                <nav class="nav-group">
+                    <span id="auth-guest">
+                        <span class="nav-link" id="btn-login-trigger">登录 / 注册</span>
+                    </span>
+                    <span id="auth-user" style="display:none; gap: 24px; align-items: center;">
+                        <a href="#" id="link-my-home" class="nav-link">我的主页</a>
+                        <a href="/settings.html" class="nav-link">设置</a>
+                        <span id="username-display" class="nav-text"></span>
+                        <a href="#" id="btn-logout" class="nav-link">退出</a>
+                    </span>
+                </nav>
             </div>
-        </nav>
-    </div>
+        </header>
 
-    <!-- Hero Section -->
-    <div class="container main-container">
-        <div class="hero-header">
-            <h1>构建你的数字花园</h1>
-            <p class="flow-text grey-text text-darken-1">
-                现代化、轻量级的静态内容管理系统。<br>
-                专注于内容的创作与沉淀，而非繁琐的部署。
-            </p>
-            <div style="margin-top: 40px;">
-                <a href="https://github.com/yharim-io/megacite" target="_blank" class="btn-large white black-text waves-effect z-depth-1" style="border: 1px solid #ddd;">
-                    <i class="material-icons left">code</i>GitHub
-                </a>
+        <!-- Hero -->
+        <div class="VPHero">
+            <div class="hero-container">
+                <h1 class="hero-name">MegaCite</h1>
+                <p class="hero-text">构建你的数字花园</p>
+                <p class="hero-tagline">现代化、轻量级的静态内容管理系统，专注于内容的沉淀。</p>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col s12 m4">
-                <div class="feature-card">
-                    <i class="material-icons feature-icon">import_contacts</i>
-                    <h5>无缝迁移</h5>
-                    <p class="grey-text">一键从 CSDN、简书等主流平台导入文章，保留原始格式与元数据。</p>
-                </div>
-            </div>
-            <div class="col s12 m4">
-                <div class="feature-card">
-                    <i class="material-icons feature-icon">bolt</i>
-                    <h5>极速静态</h5>
-                    <p class="grey-text">生成纯静态 HTML 页面，部署简单，加载速度极快，无需数据库维护。</p>
-                </div>
-            </div>
-            <div class="col s12 m4">
-                <div class="feature-card">
-                    <i class="material-icons feature-icon">auto_fix_high</i>
-                    <h5>AI 赋能</h5>
-                    <p class="grey-text">利用 AI 技术自动优化 Markdown 格式，智能生成摘要与元数据。</p>
+        <!-- Features -->
+        <div class="VPFeatures">
+            <div class="features-container">
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🚀</div>
+                        <h2 class="feature-title">无缝迁移</h2>
+                        <p class="feature-details">一键从主流平台导入文章，保留原始格式。</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h2 class="feature-title">极速静态</h2>
+                        <p class="feature-details">生成纯静态 HTML 页面，部署简单，加载极快。</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔗</div>
+                        <h2 class="feature-title">引用维护</h2>
+                        <p class="feature-details">自动管理文章间的双向引用，链接失效自动检测与修复。</p>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <footer class="VPFooter">
+            © 2025 MegaCite. Released under the Apache License.
+        </footer>
     </div>
 
-    <!-- Login Modal -->
-    <div id="login-modal" class="modal" style="max-width: 380px; border-radius: 8px;">
-        <div class="modal-content center-align">
-            <h5 class="bold" style="margin-bottom: 30px;">管理员登录</h5>
-            <div class="input-field left-align">
-                <i class="material-icons prefix">person_outline</i>
-                <input id="inp-username" type="text">
-                <label for="inp-username">用户名</label>
+    <!-- Auth Modal -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-tabs">
+                <div class="modal-tab active" id="tab-login">登录</div>
+                <div class="modal-tab" id="tab-register">注册</div>
             </div>
-            <div class="input-field left-align">
-                <i class="material-icons prefix">lock_outline</i>
-                <input id="inp-password" type="password">
-                <label for="inp-password">密码</label>
+            <div class="modal-inner">
+                <input id="inp-username" type="text" class="form-input" placeholder="用户名" autocomplete="off">
+                <input id="inp-password" type="password" class="form-input" placeholder="密码">
+                <button id="btn-submit-auth" class="btn-submit">登录</button>
+                <span id="btn-cancel-login" class="btn-cancel">取消</span>
             </div>
-        </div>
-        <div class="modal-footer" style="padding-right: 24px;">
-            <a href="#!" class="modal-close waves-effect btn-flat">取消</a>
-            <a href="#!" id="btn-submit-login" class="waves-effect waves-light btn blue darken-2" style="border-radius: 18px;">确认</a>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <script src="/app.js"></script>
 </body>
 </html>

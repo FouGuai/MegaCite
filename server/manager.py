@@ -6,7 +6,7 @@ import json
 from generator.builder import StaticSiteGenerator
 from generator.watcher import DBWatcher
 from dao.factory import create_connection
-from core.auth import user_login
+from core.auth import user_login, user_register, change_password
 
 PID_FILE = "server.pid"
 WEB_ROOT = "public"
@@ -45,30 +45,43 @@ def server_start(port: int) -> None:
             pass
 
         def do_POST(self):
-            if self.path == '/api/login':
-                content_length = int(self.headers.get('Content-Length', 0))
-                body = self.rfile.read(content_length)
-                try:
-                    data = json.loads(body)
-                    username = data.get('username')
-                    password = data.get('password')
-                    token = user_login(username, password)
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            
+            try:
+                data = json.loads(body)
+                
+                if self.path == '/api/login':
+                    token = user_login(data.get('username'), data.get('password'))
+                    self._send_json({'token': token})
                     
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps({'token': token}).encode())
-                except Exception as e:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps({'error': str(e)}).encode())
-            else:
-                self.send_error(404, "Not Found")
+                elif self.path == '/api/register':
+                    user_register(data.get('username'), data.get('password'))
+                    self._send_json({'status': 'ok'})
+                    
+                elif self.path == '/api/change_password':
+                    token = self.headers.get('Authorization')
+                    change_password(token, data.get('old_password'), data.get('new_password'))
+                    self._send_json({'status': 'ok'})
+                    
+                else:
+                    self.send_error(404, "Not Found")
+                    
+            except Exception as e:
+                self.send_response(400) # Bad Request or Unauthorized
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': str(e)}).encode())
+
+        def _send_json(self, data):
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
 
     print(f"[+] Server started on port {port}.")
     print(f"[+] Root: {abs_root}")
-    print(f"[+] Example: http://localhost:{port}/<username>/index.html")
+    print(f"[+] Example: http://localhost:{port}/")
     print("[*] Press Ctrl+C to stop.")
 
     try:

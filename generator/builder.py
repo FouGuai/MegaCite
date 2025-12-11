@@ -29,6 +29,7 @@ class StaticSiteGenerator:
             print(f"[Warning] Assets directory not found: {assets_dir}")
 
         self.sync_landing_page()
+        self.sync_static_pages()
 
     def sync_landing_page(self):
         html = self.renderer.render_landing_page()
@@ -36,6 +37,20 @@ class StaticSiteGenerator:
         with open(path, "w", encoding="utf-8") as f:
             f.write(html)
         print(f"[Gen] Landing Page generated: {path}")
+
+    def sync_static_pages(self):
+        # Settings
+        html = self.renderer.render_settings_page()
+        path = self._get_abs_path("settings.html")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(html)
+            
+        # Admin stub
+        admin_dir = self._get_abs_path("admin")
+        os.makedirs(admin_dir, exist_ok=True)
+        html_admin = self.renderer.render_admin_stub()
+        with open(os.path.join(admin_dir, "index.html"), "w", encoding="utf-8") as f:
+            f.write(html_admin)
 
     def _get_abs_path(self, rel_path: str) -> str:
         return os.path.join(self.base_dir, rel_path)
@@ -92,7 +107,7 @@ class StaticSiteGenerator:
                 p_date = r[3]
                 
                 rel_prefix = self.url_mgr.register_mapping(p_cid, username, p_cat, p_title)
-                link_href = f"{self.url_mgr.safe_title(p_cat)}/{os.path.basename(rel_prefix)}.html"
+                link_href = f"/{rel_prefix}.html" # 修正为绝对路径
                 
                 categorized[p_cat].append({
                     "title": p_title, 
