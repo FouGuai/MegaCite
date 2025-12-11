@@ -1,3 +1,4 @@
+import os
 import markdown
 from core.url_manager import URLManager
 from generator.markdown_extensions import CiteReferenceExtension
@@ -5,41 +6,19 @@ from generator.content_updater import update_post_content_in_db, update_post_ref
 
 class HTMLRenderer:
     """渲染 HTML 内容"""
-    
-    TEMPLATE_INDEX = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{username}'s Blog</title>
-</head>
-<body>
-    <h1>Articles by {username}</h1>
-    <hr>
-    {content}
-</body>
-</html>
-"""
-    TEMPLATE_POST = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{title}</title>
-</head>
-<body>
-    <h1>{title}</h1>
-    <p>Date: {date} | Author: {author} | Category: {category} | CID: {cid}</p>
-    <hr>
-    <div>
-        {content}
-    </div>
-    <hr>
-    <a href="../index.html">Back to Index</a>
-</body>
-</html>
-"""
 
     def __init__(self):
         self.url_mgr = URLManager()
+        
+        # 获取当前文件所在目录
+        base_dir = os.path.dirname(__file__)
+        
+        # 读取模板文件
+        with open(os.path.join(base_dir, "index_template.html"), "r", encoding="utf-8") as f:
+            self.template_index = f.read()
+            
+        with open(os.path.join(base_dir, "post_template.html"), "r", encoding="utf-8") as f:
+            self.template_post = f.read()
 
     def render_user_index(self, username: str, categorized_posts: dict) -> str:
         parts = []
@@ -47,12 +26,14 @@ class HTMLRenderer:
             posts = categorized_posts[category]
             items = []
             for p in posts:
-                items.append(f'<li><a href="{p["filename"]}">{p["title"]}</a></li>')
-            list_html = "\n".join(items) if items else "<li>No posts.</li>"
-            parts.append(f"<h2>{category}</h2><ul>{list_html}</ul>")
-        return self.TEMPLATE_INDEX.format(
+                # 修改：在链接前添加日期 span
+                items.append(f'<li><span class="post-date">{p["date"]}</span><a href="{p["filename"]}">{p["title"]}</a></li>')
+            list_html = "\n".join(items) if items else "<li class='empty'>No posts.</li>"
+            parts.append(f'<section class="category-section"><h2>{category}</h2><ul class="post-list">{list_html}</ul></section>')
+        
+        return self.template_index.format(
             username=username,
-            content="\n".join(parts) or "<p>No posts found.</p>"
+            content="\n".join(parts) or "<p class='empty'>No posts found.</p>"
         )
 
     def render_post(self, post_data: dict, author_name: str, cid: str) -> str:
@@ -65,13 +46,14 @@ class HTMLRenderer:
                 update_post_content_in_db(cid, old_str, new_str)
 
         md = markdown.Markdown(extensions=[
+            'fenced_code', 'tables',
             CiteReferenceExtension(url_mgr=self.url_mgr, db_callback=processor_callback)
         ])
         content = md.convert(raw_content)
 
         update_post_references_in_db(cid, found_refs)
         
-        return self.TEMPLATE_POST.format(
+        return self.template_post.format(
             title=post_data.get("title", "Untitled"),
             date=post_data.get("date", ""),
             author=author_name,

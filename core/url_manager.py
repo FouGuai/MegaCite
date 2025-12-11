@@ -21,10 +21,20 @@ class URLManager:
             return "untitled"
         
         safe = title.strip()
-        safe = safe.replace(" ", "-").replace("/", "-").replace("\\", "-")
+        
+        # 1. 恢复空格转横杠的功能 (Slugify)
+        safe = safe.replace(" ", "-")
+        
+        # 2. 替换文件系统非法字符，但保留中文不进行 URL 编码
+        # 这样生成的文件名在文件系统中是可见字符 (如中文)，http.server 也能正确找到
+        for char in ['<', '>', ':', '"', '/', '\\', '|', '?', '*']:
+            safe = safe.replace(char, '-')
+            
+        # 3. 合并连续的横杠
         while "--" in safe:
             safe = safe.replace("--", "-")
-        return urllib.parse.quote(safe)
+            
+        return safe
 
     def register_mapping(self, cid: str, username: str, category: str, title: str) -> str:
         """
@@ -68,8 +78,8 @@ class URLManager:
         if parsed.hostname not in allowed_hosts:
             return None
             
-        # 提取路径
-        url_path = parsed.path
+        # 提取路径并解码 (防止数据库存的是中文，但 URL 是编码过的情况)
+        url_path = urllib.parse.unquote(parsed.path)
         
         # 查库
         conn = create_connection()

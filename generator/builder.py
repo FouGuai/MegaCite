@@ -1,4 +1,5 @@
 import os
+import shutil
 from collections import defaultdict
 from core.url_manager import URLManager
 from generator.renderer import HTMLRenderer
@@ -17,6 +18,15 @@ class StaticSiteGenerator:
     def init_output_dir(self):
         if not os.path.exists(self.base_dir):
             os.makedirs(self.base_dir)
+            
+        # 从 generator 目录复制 style.css 到 public 目录
+        src_css = os.path.join(os.path.dirname(__file__), "style.css")
+        dst_css = os.path.join(self.base_dir, "style.css")
+        
+        if os.path.exists(src_css):
+            shutil.copy(src_css, dst_css)
+        else:
+            print(f"[Warning] Source CSS not found: {src_css}")
 
     def _get_abs_path(self, rel_path: str) -> str:
         return os.path.join(self.base_dir, rel_path)
@@ -71,20 +81,25 @@ class StaticSiteGenerator:
                 username = row[0]
 
             with conn.cursor() as cur:
-                cur.execute("SELECT cid, title, category FROM posts WHERE owner_id=%s ORDER BY date DESC", (user_id,))
+                # 修改：增加了 date 字段的查询，且保持 ORDER BY date DESC
+                cur.execute("SELECT cid, title, category, date FROM posts WHERE owner_id=%s ORDER BY date DESC", (user_id,))
                 rows = cur.fetchall()
 
             categorized = defaultdict(list)
             for r in rows:
                 p_cid, p_title = r[0], r[1] or "untitled"
                 p_cat = r[2] or "default"
+                p_date = r[3] # 获取日期
                 
                 rel_prefix = self.url_mgr.register_mapping(p_cid, username, p_cat, p_title)
                 
-                # 相对路径：从 username/index.html 到 username/category/title.html
                 link_href = f"{self.url_mgr.safe_title(p_cat)}/{os.path.basename(rel_prefix)}.html"
                 
-                categorized[p_cat].append({"title": p_title, "filename": link_href})
+                categorized[p_cat].append({
+                    "title": p_title, 
+                    "filename": link_href,
+                    "date": str(p_date) # 存入日期
+                })
             
             html = self.renderer.render_user_index(username, categorized)
             index_path = self._get_abs_path(f"{username}/index.html")

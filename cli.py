@@ -3,6 +3,7 @@ import sys
 from core import auth, post
 from server import manager as server_manager
 from client import store
+import crawler 
 
 def main():
     parser = argparse.ArgumentParser(description="MegaCite CLI Tool")
@@ -61,6 +62,10 @@ def main():
     search_p = post_subs.add_parser("search", help="Search")
     search_p.add_argument("keyword")
 
+    # migrate
+    migrate_p = post_subs.add_parser("migrate", help="Migrate post from URL")
+    migrate_p.add_argument("url")
+
     args = parser.parse_args()
 
     try:
@@ -70,11 +75,9 @@ def main():
 
         elif args.command == "user":
             if args.action == "register":
-                # 直接使用位置参数
                 uid = auth.user_register(args.username, args.password)
                 print(f"User registered. ID: {uid}")
             elif args.action == "login":
-                # 直接使用位置参数
                 token = auth.user_login(args.username, args.password)
                 store.save_local_token(token)
                 print("Login successful.")
@@ -93,7 +96,6 @@ def main():
                 print(f"Post created. CID: {new_cid}")
             
             elif args.action == "update":
-                # 处理转义字符
                 value = args.value.replace("\\n", "\n")
                 ok = post.post_update(token, args.cid, args.field, value)
                 print("Success" if ok else "Failed")
@@ -107,6 +109,10 @@ def main():
             
             elif args.action == "search":
                 print(f"Results: {post.post_search(token, args.keyword)}")
+
+            elif args.action == "migrate":
+                cid = crawler.migrate_post_from_url(token, args.url)
+                print(f"Migration successful. CID: {cid}")
 
     except PermissionError:
         print("Error: Please login first.")

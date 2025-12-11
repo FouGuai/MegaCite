@@ -212,3 +212,4 @@ uv.lock
 # MegaCite
 public/
 .pytest_cache/
+MC_API_KEY.sh
