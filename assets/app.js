@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let isRegisterMode = false;
 
-    // --- Toast Function ---
+    // --- Toast Function (Updated for better visuals) ---
     function showToast(message) {
         let container = document.querySelector('.toast-container');
         if (!container) {
@@ -34,7 +34,11 @@ document.addEventListener('DOMContentLoaded', () => {
         toast.className = 'toast';
         toast.textContent = message;
         container.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-10px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
     // --- Auth State ---
@@ -68,9 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem('mc_username');
             updateUI();
             showToast('已退出登录');
-            // 如果在设置页，退回首页
-            if (window.location.pathname.includes('settings.html')) {
-                window.location.href = '/';
+            // 如果在设置页或私人主页，退回 Landing Page
+            if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+                setTimeout(() => window.location.href = '/', 500);
             }
         });
     }
@@ -79,11 +83,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const openModal = (e) => {
         if(e) e.preventDefault();
         if(modalOverlay) modalOverlay.classList.add('open');
+        if(inpUser) inpUser.focus();
     };
     const closeModal = () => {
         if(modalOverlay) modalOverlay.classList.remove('open');
-        if(inpUser) inpUser.value = '';
-        if(inpPass) inpPass.value = '';
+        setTimeout(() => {
+            if(inpUser) inpUser.value = '';
+            if(inpPass) inpPass.value = '';
+        }, 200);
     };
 
     const switchTab = (toRegister) => {
@@ -91,11 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (toRegister) {
             tabRegister.classList.add('active');
             tabLogin.classList.remove('active');
-            if(btnSubmit) btnSubmit.textContent = '注册';
+            if(btnSubmit) btnSubmit.textContent = '注册并登录';
         } else {
             tabLogin.classList.add('active');
             tabRegister.classList.remove('active');
-            if(btnSubmit) btnSubmit.textContent = '登录';
+            if(btnSubmit) btnSubmit.textContent = '立即登录';
         }
     };
 
@@ -118,11 +125,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auth Action (Login / Register)
     if (btnSubmit) {
         btnSubmit.addEventListener('click', async () => {
-            const username = inpUser.value;
-            const password = inpPass.value;
+            const username = inpUser.value.trim();
+            const password = inpPass.value.trim();
 
             if (!username || !password) {
-                showToast('请输入完整信息');
+                showToast('请填写完整信息');
                 return;
             }
             
@@ -133,44 +140,44 @@ document.addEventListener('DOMContentLoaded', () => {
             const endpoint = isRegisterMode ? '/api/register' : '/api/login';
 
             try {
-                const res = await fetch(endpoint, {
+                // 如果是注册，先注册再自动尝试登录
+                if (isRegisterMode) {
+                    const regRes = await fetch('/api/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    if (!regRes.ok) {
+                        const err = await regRes.json();
+                        throw new Error(err.error || '注册失败');
+                    }
+                }
+
+                // 统一执行登录
+                const loginRes = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
 
-                if (res.ok) {
-                    const data = await res.json();
+                if (loginRes.ok) {
+                    const data = await loginRes.json();
+                    localStorage.setItem('mc_token', data.token);
+                    localStorage.setItem('mc_username', username);
                     
-                    if (isRegisterMode) {
-                        showToast('注册成功，请登录');
-                        switchTab(false); // 切换回登录页
-                    } else {
-                        localStorage.setItem('mc_token', data.token);
-                        localStorage.setItem('mc_username', username); // 保存用户名
-                        
-                        closeModal();
-                        updateUI();
-                        showToast('登录成功');
+                    closeModal();
+                    updateUI();
+                    showToast(isRegisterMode ? '注册成功，已自动登录' : '欢迎回来');
 
-                        // Admin 跳转逻辑
-                        if (username === 'admin') {
-                            setTimeout(() => {
-                                window.location.href = '/admin/index.html';
-                            }, 500);
-                        } else {
-                            // 普通用户跳转到自己的主页
-                            setTimeout(() => {
-                                window.location.href = `/${username}/index.html`;
-                            }, 500);
-                        }
-                    }
+                    setTimeout(() => {
+                        window.location.href = `/${username}/index.html`;
+                    }, 800);
                 } else {
-                    const err = await res.json();
-                    showToast('操作失败: ' + (err.error || '未知错误'));
+                    const err = await loginRes.json();
+                    throw new Error(err.error || '登录失败');
                 }
             } catch (e) {
-                showToast('无法连接到服务器');
+                showToast(e.message || '网络连接错误');
             } finally {
                 btnSubmit.disabled = false;
                 btnSubmit.textContent = originalText;
@@ -180,7 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Settings Page Logic
     if (settingsForm) {
-        // 检查是否登录
         if (!localStorage.getItem('mc_token')) {
             window.location.href = '/';
         }
@@ -194,6 +200,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('请填写所有字段');
                 return;
             }
+
+            const btn = settingsForm.querySelector('button');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '修改中...';
 
             try {
                 const res = await fetch('/api/change_password', {
@@ -211,10 +222,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     inpNewPass.value = '';
                 } else {
                     const err = await res.json();
-                    showToast('失败: ' + (err.error || '未知错误'));
+                    showToast('操作失败: ' + (err.error || '未知错误'));
                 }
             } catch (e) {
                 showToast('网络错误');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
             }
         });
     }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
+    <title>{title} - {author}</title>
     <link href="/style.css" rel="stylesheet">
 </head>
 <body>
@@ -11,15 +11,15 @@
         <header class="VPNav">
             <div class="VPNavBar">
                 <a href="/" class="title-container">
-                    <img src="/logo.svg" alt="Logo" class="logo">
-                    <span class="site-title">MegaCite</span>
+                    <img src="/logo.svg" alt="M" class="logo">
+                    <span>MegaCite</span>
                 </a>
                 <nav class="nav-group">
                     <span id="auth-guest">
-                        <span class="nav-link" id="btn-login-trigger">登录 / 注册</span>
+                        <span class="nav-link" id="btn-login-trigger">登录</span>
                     </span>
-                    <span id="auth-user" style="display:none; gap: 24px; align-items: center;">
-                        <a href="#" id="link-my-home" class="nav-link">我的主页</a>
+                    <span id="auth-user" style="display:none; gap: 20px; align-items: center;">
+                        <a href="#" id="link-my-home" class="nav-link">控制台</a>
                         <a href="/settings.html" class="nav-link">设置</a>
                         <span id="username-display" class="nav-text"></span>
                         <a href="#" id="btn-logout" class="nav-link">退出</a>
@@ -29,24 +29,31 @@
         </header>
 
         <main class="container-narrow">
-            <article class="post-content">
-                <h1>{title}</h1>
-                <div style="font-size: 15px; color: var(--vp-c-text-2); margin-bottom: 48px; padding-bottom: 24px; border-bottom: 1px solid var(--vp-c-divider); display: flex; gap: 16px; align-items: center;">
-                    <a href="/{author}/index.html" class="nav-link" style="color: inherit; font-weight: 500;">{author}</a>
-                    <span>·</span>
-                    <span>{date}</span>
-                    <span>·</span>
-                    <span style="color: var(--vp-c-brand);">{category}</span>
-                </div>
+            <article>
+                <header class="post-header">
+                    <h1 class="post-title">{title}</h1>
+                    <div class="post-meta-row">
+                        <a href="/{author}/index.html" style="font-weight: 500; color: var(--vp-c-text-1);">{author}</a>
+                        <span style="color: var(--vp-c-divider);">|</span>
+                        <span class="post-tag">{category}</span>
+                        <span style="color: var(--vp-c-divider);">|</span>
+                        <span>{date}</span>
+                    </div>
+                </header>
 
-                <!-- renderer生成的摘要块 (card-panel) 会被 style.css 修正为 VitePress Info Block 样式 -->
+                <!-- 摘要块 (Renderer 生成) -->
                 {description_block}
 
-                {content}
+                <!-- 正文内容 -->
+                <div class="post-content">
+                    {content}
+                </div>
             </article>
 
-            <div style="margin-top: 80px; padding-top: 32px; border-top: 1px solid var(--vp-c-divider);">
-                <a href="../index.html" style="font-size: 16px; font-weight: 500; color: var(--vp-c-brand);">← 返回文章列表</a>
+            <div style="margin-top: 80px; padding-top: 40px; border-top: 1px solid var(--vp-c-divider);">
+                <a href="../index.html" class="nav-link" style="display: inline-flex; align-items: center; gap: 8px;">
+                    <span>←</span> 返回文章列表
+                </a>
             </div>
         </main>
 
@@ -65,7 +72,7 @@
             <div class="modal-inner">
                 <input id="inp-username" type="text" class="form-input" placeholder="用户名">
                 <input id="inp-password" type="password" class="form-input" placeholder="密码">
-                <button id="btn-submit-auth" class="btn-submit">登录</button>
+                <button id="btn-submit-auth" class="btn-submit">提交</button>
                 <span id="btn-cancel-login" class="btn-cancel">取消</span>
             </div>
         </div>

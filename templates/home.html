@@ -3,24 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MegaCite</title>
+    <title>MegaCite - 构建你的数字花园</title>
     <link href="/style.css" rel="stylesheet">
 </head>
 <body>
     <div class="layout">
-        <!-- Navbar -->
         <header class="VPNav">
             <div class="VPNavBar">
                 <a href="/" class="title-container">
-                    <img src="/logo.svg" alt="Logo" class="logo">
-                    <span class="site-title">MegaCite</span>
+                    <img src="/logo.svg" alt="M" class="logo">
+                    <span>MegaCite</span>
                 </a>
                 <nav class="nav-group">
                     <span id="auth-guest">
-                        <span class="nav-link" id="btn-login-trigger">登录 / 注册</span>
+                        <span class="nav-link" id="btn-login-trigger">登录</span>
                     </span>
-                    <span id="auth-user" style="display:none; gap: 24px; align-items: center;">
-                        <a href="#" id="link-my-home" class="nav-link">我的主页</a>
+                    <span id="auth-user" style="display:none; gap: 20px; align-items: center;">
+                        <a href="#" id="link-my-home" class="nav-link">控制台</a>
                         <a href="/settings.html" class="nav-link">设置</a>
                         <span id="username-display" class="nav-text"></span>
                         <a href="#" id="btn-logout" class="nav-link">退出</a>
@@ -29,40 +28,36 @@
             </div>
         </header>
 
-        <!-- Hero -->
-        <div class="VPHero">
-            <div class="hero-container">
+        <main class="container">
+            <div class="VPHero">
                 <h1 class="hero-name">MegaCite</h1>
-                <p class="hero-text">构建你的数字花园</p>
-                <p class="hero-tagline">现代化、轻量级的静态内容管理系统，专注于内容的沉淀。</p>
+                <p class="hero-text">沉淀知识，连接价值</p>
+                <p class="hero-tagline">现代化、轻量级的静态内容管理系统。<br>自动管理引用，一键从多平台迁移。</p>
             </div>
-        </div>
+        </main>
 
-        <!-- Features -->
         <div class="VPFeatures">
-            <div class="features-container">
-                <div class="features-grid">
-                    <div class="feature-card">
-                        <div class="feature-icon">🚀</div>
-                        <h2 class="feature-title">无缝迁移</h2>
-                        <p class="feature-details">一键从主流平台导入文章，保留原始格式。</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">⚡</div>
-                        <h2 class="feature-title">极速静态</h2>
-                        <p class="feature-details">生成纯静态 HTML 页面，部署简单，加载极快。</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">🔗</div>
-                        <h2 class="feature-title">引用维护</h2>
-                        <p class="feature-details">自动管理文章间的双向引用，链接失效自动检测与修复。</p>
-                    </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3 class="feature-title">无缝迁移</h3>
+                    <p class="feature-details">支持从主流技术社区（CSDN、掘金等）一键导入文章，完整保留格式与元数据。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3 class="feature-title">极速静态</h3>
+                    <p class="feature-details">生成纯静态 HTML，部署简单，加载速度极快，无需复杂的后端运行时。</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔗</div>
+                    <h3 class="feature-title">智能引用</h3>
+                    <p class="feature-details">自动构建文章间的双向引用网络，当链接变更时自动修复所有相关页面。</p>
                 </div>
             </div>
         </div>
 
         <footer class="VPFooter">
-            © 2025 MegaCite. Released under the Apache License.
+            © 2025 MegaCite Project. Released under the Apache-2.0 License.
         </footer>
     </div>
 
@@ -76,8 +71,8 @@
             <div class="modal-inner">
                 <input id="inp-username" type="text" class="form-input" placeholder="用户名" autocomplete="off">
                 <input id="inp-password" type="password" class="form-input" placeholder="密码">
-                <button id="btn-submit-auth" class="btn-submit">登录</button>
-                <span id="btn-cancel-login" class="btn-cancel">取消</span>
+                <button id="btn-submit-auth" class="btn-submit">立即登录</button>
+                <span id="btn-cancel-login" class="btn-cancel">暂不登录</span>
             </div>
         </div>
     </div>

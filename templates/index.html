@@ -3,24 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{username} - Articles</title>
+    <title>{username} 的知识库</title>
     <link href="/style.css" rel="stylesheet">
 </head>
 <body>
     <div class="layout">
-        <!-- Navbar -->
         <header class="VPNav">
             <div class="VPNavBar">
                 <a href="/" class="title-container">
-                    <img src="/logo.svg" alt="Logo" class="logo">
-                    <span class="site-title">MegaCite</span>
+                    <img src="/logo.svg" alt="M" class="logo">
+                    <span>MegaCite</span>
                 </a>
                 <nav class="nav-group">
                     <span id="auth-guest">
-                        <span class="nav-link" id="btn-login-trigger">登录 / 注册</span>
+                        <span class="nav-link" id="btn-login-trigger">登录</span>
                     </span>
-                    <span id="auth-user" style="display:none; gap: 24px; align-items: center;">
-                        <a href="#" id="link-my-home" class="nav-link">我的主页</a>
+                    <span id="auth-user" style="display:none; gap: 20px; align-items: center;">
+                        <a href="#" id="link-my-home" class="nav-link active">控制台</a>
                         <a href="/settings.html" class="nav-link">设置</a>
                         <span id="username-display" class="nav-text"></span>
                         <a href="#" id="btn-logout" class="nav-link">退出</a>
@@ -30,13 +29,11 @@
         </header>
 
         <main class="container">
-            <div style="margin-bottom: 64px;">
-                <h1 style="font-size: 32px; font-weight: 800; margin-bottom: 8px;">{username}</h1>
-                <p style="color: var(--vp-c-text-2); font-size: 16px;">个人知识库归档</p>
+            <div style="margin-bottom: 60px; padding-bottom: 20px; border-bottom: 1px solid var(--vp-c-divider);">
+                <h1 style="font-size: 32px; font-weight: 800; color: var(--vp-c-text-1); margin: 0 0 8px;">{username}</h1>
+                <p style="color: var(--vp-c-text-2); margin: 0;">个人知识库归档</p>
             </div>
             
-            <!-- 这里的 {content} 虽然包含 Materialize 的类名 -->
-            <!-- 但 assets/style.css 已经针对这些类名做了彻底的样式重写 -->
             {content}
         </main>
 
@@ -55,7 +52,7 @@
             <div class="modal-inner">
                 <input id="inp-username" type="text" class="form-input" placeholder="用户名">
                 <input id="inp-password" type="password" class="form-input" placeholder="密码">
-                <button id="btn-submit-auth" class="btn-submit">登录</button>
+                <button id="btn-submit-auth" class="btn-submit">提交</button>
                 <span id="btn-cancel-login" class="btn-cancel">取消</span>
             </div>
         </div>
