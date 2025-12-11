@@ -2,6 +2,7 @@ from verification.csdn import CSDNVerifier
 from verification.jianshu import JianshuVerifier
 from verification.cnblogs import CNBlogsVerifier
 from verification.juejin import JuejinVerifier
+from verification.yuque import YuqueVerifier
 
 def _get_verifier(platform_or_url: str):
     target = platform_or_url.lower()
@@ -21,6 +22,10 @@ def _get_verifier(platform_or_url: str):
     # 掘金 匹配
     if target == "juejin" or "juejin.cn" in target:
         return JuejinVerifier()
+
+    # 语雀 匹配
+    if target == "yuque" or "yuque.com" in target:
+        return YuqueVerifier()
         
     return None
 
