@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from core.url_manager import URLManager
 from generator.renderer import HTMLRenderer
 from dao.factory import create_connection
@@ -23,8 +24,9 @@ class StaticSiteGenerator:
     def sync_post_file(self, post_data: dict, author_name: str):
         cid = post_data["cid"]
         title = post_data["title"] or "untitled"
+        category = post_data.get("catagory") or "default"
         
-        rel_prefix = self.url_mgr.register_mapping(cid, author_name, title)
+        rel_prefix = self.url_mgr.register_mapping(cid, author_name, category, title)
         filename = rel_prefix + ".html"
         full_path = self._get_abs_path(filename)
         
@@ -46,17 +48,23 @@ class StaticSiteGenerator:
                 username = row[0]
 
             with conn.cursor() as cur:
-                cur.execute("SELECT cid, title FROM posts WHERE owner_id=%s ORDER BY date DESC", (user_id,))
+                cur.execute("SELECT cid, title, catagory FROM posts WHERE owner_id=%s ORDER BY date DESC", (user_id,))
                 rows = cur.fetchall()
 
-            post_list = []
+            # 按 Category 分组
+            categorized = defaultdict(list)
             for r in rows:
                 p_cid, p_title = r[0], r[1] or "untitled"
-                rel_prefix = self.url_mgr.register_mapping(p_cid, username, p_title)
-                file_name = os.path.basename(rel_prefix) + ".html"
-                post_list.append({"title": p_title, "filename": file_name})
+                p_cat = r[2] or "default"
+                
+                rel_prefix = self.url_mgr.register_mapping(p_cid, username, p_cat, p_title)
+                
+                # 相对路径：从 username/index.html 到 username/category/title.html
+                link_href = f"{self.url_mgr.safe_title(p_cat)}/{os.path.basename(rel_prefix)}.html"
+                
+                categorized[p_cat].append({"title": p_title, "filename": link_href})
             
-            html = self.renderer.render_user_index(username, post_list)
+            html = self.renderer.render_user_index(username, categorized)
             index_path = self._get_abs_path(f"{username}/index.html")
             
             os.makedirs(os.path.dirname(index_path), exist_ok=True)

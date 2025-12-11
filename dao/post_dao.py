@@ -9,14 +9,14 @@ class MySQLPostDAO:
     def __init__(self, conn: pymysql.connections.Connection):
         self.conn = conn
 
-    def create_post(self, owner_id: int, cid: str, title: str, date: str = None) -> None:
-        """创建文章，必须提供 title"""
+    def create_post(self, owner_id: int, cid: str, title: str, catagory: str = "default", date: str = None) -> None:
+        """创建文章，必须提供 title，category 默认为 default"""
         if date is None:
             date = datetime.now().date()
         with self.conn.cursor() as cur:
             cur.execute(
-                "INSERT INTO posts (cid, owner_id, title, date) VALUES (%s, %s, %s, %s)",
-                (cid, owner_id, title, date),
+                "INSERT INTO posts (cid, owner_id, title, catagory, date) VALUES (%s, %s, %s, %s, %s)",
+                (cid, owner_id, title, catagory, date),
             )
         self.conn.commit()
 

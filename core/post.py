@@ -6,8 +6,16 @@ from core.auth import verify_token
 from core.security import generate_cid
 from core.url_manager import URLManager
 
-def _update_url_mapping(conn, cid: str, owner_id: int, title: str | None):
+def _update_url_mapping(conn, cid: str):
     """内部辅助函数：计算并更新 URL 映射"""
+    post_dao = MySQLPostDAO(conn)
+    owner_id = post_dao.get_field(cid, "owner_id")
+    title = post_dao.get_field(cid, "title")
+    catagory = post_dao.get_field(cid, "catagory")
+    
+    if not owner_id: 
+        return
+
     user_dao = MySQLUserDAO(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT username FROM users WHERE id = %s", (owner_id,))
@@ -15,8 +23,12 @@ def _update_url_mapping(conn, cid: str, owner_id: int, title: str | None):
         if not row: return
         username = row[0]
 
-    safe_title = URLManager().safe_title(title or "untitled")
-    url_path = f"/{username}/{safe_title}.html"
+    mgr = URLManager()
+    safe_title = mgr.safe_title(title or "untitled")
+    safe_cat = mgr.safe_title(catagory or "default")
+
+    # 构造新路径结构: /username/category/title.html
+    url_path = f"/{username}/{safe_cat}/{safe_title}.html"
 
     map_dao = MySQLUrlMapDAO(conn)
     map_dao.upsert_mapping(cid, url_path)
@@ -36,16 +48,16 @@ def post_create(token: str) -> str:
     new_cid = generate_cid()
     
     # 自动生成唯一默认标题: Untitled-{CID}
-    # CID 是唯一的，所以 Title 在用户范围内也绝对唯一
     default_title = f"Untitled-{new_cid}"
+    default_cat = "default"
     
     conn = create_connection()
     try:
         dao = MySQLPostDAO(conn)
-        dao.create_post(owner_id=user_id, cid=new_cid, title=default_title, date=None)
+        dao.create_post(owner_id=user_id, cid=new_cid, title=default_title, catagory=default_cat, date=None)
         
         # 立即更新映射表
-        _update_url_mapping(conn, new_cid, user_id, default_title)
+        _update_url_mapping(conn, new_cid)
         
         return new_cid
     finally:
@@ -60,13 +72,12 @@ def post_update(token: str, cid: str, field: str, value: str) -> bool:
         try:
             result = dao.update_field(cid, field, value)
         except pymysql.err.IntegrityError:
-            # 捕获违反唯一性约束 (IntegrityError)，即 Title 重复
+            # 捕获违反唯一性约束 (IntegrityError)，即 Category+Title 重复
             return False
         
-        if result and field == "title":
-            owner_id = dao.get_field(cid, "owner_id")
-            if owner_id:
-                _update_url_mapping(conn, cid, owner_id, value)
+        # 只要修改了 title 或 catagory，就需要重新生成 URL
+        if result and field in ("title", "catagory"):
+            _update_url_mapping(conn, cid)
                 
         return result
     finally:

@@ -33,10 +33,11 @@ CREATE TABLE posts (
     title VARCHAR(255) NOT NULL,
     `context` LONGTEXT,
     description TEXT,
-    catagory VARCHAR(255),
+    catagory VARCHAR(255) NOT NULL DEFAULT 'default',
     date DATE NOT NULL,
-    -- 确保同一个用户的 title 不重复
-    UNIQUE KEY ux_owner_title (owner_id, title),
+    -- 确保同一个用户在同一个 category 下的 title 不重复
+    -- 现在的 URL 结构是 username/category/title，因此需要这个联合唯一约束
+    UNIQUE KEY ux_owner_category_title (owner_id, catagory, title),
     CONSTRAINT fk_post_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
