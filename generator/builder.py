@@ -48,6 +48,12 @@ class StaticSiteGenerator:
         with open(path, "w", encoding="utf-8") as f:
             f.write(html)
             
+        # [新增] Editor
+        html_editor = self.renderer.render_editor_page()
+        path_editor = self._get_abs_path("edit.html")
+        with open(path_editor, "w", encoding="utf-8") as f:
+            f.write(html_editor)
+            
         # Admin stub
         admin_dir = self._get_abs_path("admin")
         os.makedirs(admin_dir, exist_ok=True)
@@ -112,7 +118,6 @@ class StaticSiteGenerator:
                 rel_prefix = self.url_mgr.register_mapping(p_cid, username, p_cat, p_title)
                 link_href = f"/{rel_prefix}.html"
                 
-                # [修改] 增加 cid 字段，供前端删除按钮使用
                 categorized[p_cat].append({
                     "cid": p_cid,
                     "title": p_title, 

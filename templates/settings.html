@@ -37,25 +37,29 @@
                 <h3 class="settings-header">安全中心</h3>
                 <p style="margin: 0 0 20px 0; font-size: 14px; color: var(--vp-c-text-2);">为了您的账户安全，建议定期更换密码。</p>
                 
-                <form id="settings-form" style="max-width: 400px;">
-                    <div>
-                        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--vp-c-text-2);">旧密码</label>
-                        <div class="password-wrapper">
-                            <input id="inp-old-pass" type="password" class="form-input" placeholder="请输入当前密码">
-                            <span class="password-toggle">
-                                <!-- Eye Off Icon (Default) -->
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
-                            </span>
+                <!-- [修改] 增加 max-width 以容纳并排布局 -->
+                <form id="settings-form" style="max-width: 600px;">
+                    <!-- [修改] 使用 Flex 布局实现并排 -->
+                    <div style="display: flex; gap: 20px;">
+                        <div style="flex: 1;">
+                            <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--vp-c-text-2);">旧密码</label>
+                            <div class="password-wrapper">
+                                <input id="inp-old-pass" type="password" class="form-input" placeholder="请输入当前密码">
+                                <span class="password-toggle">
+                                    <!-- Eye Off Icon (Default) -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                                </span>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div>
-                        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--vp-c-text-2);">新密码</label>
-                        <div class="password-wrapper">
-                            <input id="inp-new-pass" type="password" class="form-input" placeholder="设置新密码">
-                            <span class="password-toggle">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
-                            </span>
+                        
+                        <div style="flex: 1;">
+                            <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--vp-c-text-2);">新密码</label>
+                            <div class="password-wrapper">
+                                <input id="inp-new-pass" type="password" class="form-input" placeholder="设置新密码">
+                                <span class="password-toggle">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                                </span>
+                            </div>
                         </div>
                     </div>
                     
@@ -75,9 +79,10 @@
                             <button class="btn-bind status-loading" data-platform="csdn" onclick="startAuth('csdn')">加载中...</button>
                         </div>
                     </div>
-                    <!-- 掘金 -->
+                    <!-- 稀土掘金 -->
                     <div class="platform-card">
-                        <span class="platform-name">掘金</span>
+                        <!-- [修改] 掘金 -> 稀土掘金 -->
+                        <span class="platform-name">稀土掘金</span>
                         <div class="action-group">
                             <button class="btn-unbind" style="display:none" data-platform="juejin" onclick="unbindAuth('juejin')">解绑</button>
                             <button class="btn-bind status-loading" data-platform="juejin" onclick="startAuth('juejin')">加载中...</button>

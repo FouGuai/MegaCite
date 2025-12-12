@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- [新增] 元数据，用于前端鉴权 -->
+    <meta name="post-cid" content="{cid}">
+    <meta name="post-author" content="{author}">
     <title>{title} - {author}</title>
     <link href="/style.css" rel="stylesheet">
 </head>
@@ -34,29 +37,30 @@
                     <h1 class="post-title">{title}</h1>
                     <div class="post-meta-row">
                         <div class="meta-item">
-                            <!-- User Icon -->
                             <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                             <a href="/{author}/index.html">{author}</a>
                         </div>
                         
                         <div class="meta-item">
-                            <!-- Folder Icon -->
                             <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
                             <span>{category}</span>
                         </div>
                         
                         <div class="meta-item">
-                            <!-- Clock Icon -->
                             <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                             <span>{date}</span>
                         </div>
+
+                        <!-- [新增] 编辑按钮 (默认隐藏，JS 控制显示) -->
+                        <button id="btn-edit-trigger" class="btn-edit-post" style="display:none;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                            编辑
+                        </button>
                     </div>
                 </header>
 
-                <!-- 摘要块 (Renderer 生成) -->
                 {description_block}
 
-                <!-- 正文内容 -->
                 <div class="post-content">
                     {content}
                 </div>
@@ -74,7 +78,7 @@
         </footer>
     </div>
 
-    <!-- Auth Modal -->
+    <!-- Login Modal -->
     <div id="login-modal" class="modal-overlay">
         <div class="modal-box">
             <div class="modal-tabs">

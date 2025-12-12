@@ -11,8 +11,9 @@ from dao.factory import create_connection
 from dao.auth_dao import MySQLAuthDAO
 from dao.post_dao import MySQLPostDAO
 from dao.user_dao import MySQLUserDAO
+from dao.url_map_dao import MySQLUrlMapDAO
 from core.auth import user_login, user_register, change_password, verify_token
-from core.post import post_create, post_delete
+from core.post import post_create, post_delete, post_get_full, post_update_content
 from crawler.service import migrate_post_from_url
 from verification import manager as verify_manager
 
@@ -134,7 +135,8 @@ def server_start(port: int) -> None:
             return token
 
         def do_GET(self):
-            if self.path == '/settings.html' or self.path.startswith('/settings.html?'):
+            # 拦截 settings.html 和 edit.html，未登录直接返回 404
+            if self.path.startswith('/settings.html') or self.path.startswith('/edit.html'):
                 if not self._check_auth_cookie():
                     self.send_error(404, "Not Found")
                     return
@@ -190,6 +192,29 @@ def server_start(port: int) -> None:
                 except Exception as e:
                     self.send_error(400, str(e))
             
+            elif parsed_path.path == '/api/post/detail':
+                try:
+                    token = self._get_token()
+                    cid = query_params.get('cid', [None])[0]
+                    if not cid:
+                        self.send_error(400, "Missing cid")
+                        return
+                    
+                    data = post_get_full(token, cid)
+                    self._send_json(data)
+                except Exception as e:
+                    self.send_error(400, str(e))
+
+            elif parsed_path.path == '/api/categories':
+                try:
+                    conn = create_connection()
+                    dao = MySQLPostDAO(conn)
+                    cats = dao.get_all_categories()
+                    conn.close()
+                    self._send_json({'categories': cats})
+                except Exception as e:
+                    self.send_error(400, str(e))
+
             else:
                 super().do_GET()
 
@@ -233,7 +258,6 @@ def server_start(port: int) -> None:
                         self.wfile.write(json.dumps({'error': str(ve)}).encode())
                         return
 
-                # --- 文章管理 APIs ---
                 elif self.path == '/api/post/create':
                     try:
                         token = self._get_token()
@@ -244,7 +268,35 @@ def server_start(port: int) -> None:
                     except Exception as e:
                          self.send_error(400, str(e))
                 
-                # [新增] 删除文章接口
+                elif self.path == '/api/post/update':
+                    try:
+                        token = self._get_token()
+                        user_id = verify_token(token)
+                        
+                        cid = data.get('cid')
+                        title = data.get('title')
+                        category = data.get('category')
+                        context = data.get('context')
+                        description = data.get('description') # [新增] 读取摘要
+                        
+                        if post_update_content(token, cid, title, category, context, description):
+                            force_sync_post(cid, user_id)
+                            
+                            # 获取文章的最新 URL 返回给前端跳转
+                            target_url = None
+                            conn = create_connection()
+                            try:
+                                map_dao = MySQLUrlMapDAO(conn)
+                                target_url = map_dao.get_url_by_cid(cid)
+                            finally:
+                                conn.close()
+                                
+                            self._send_json({'status': 'ok', 'url': target_url})
+                        else:
+                            self.send_error(400, "Update failed")
+                    except Exception as e:
+                        self.send_error(400, str(e))
+
                 elif self.path == '/api/post/delete':
                     try:
                         token = self._get_token()
@@ -252,7 +304,6 @@ def server_start(port: int) -> None:
                         cid = data.get('cid')
                         
                         if post_delete(token, cid):
-                            # 强制同步：物理删除文件 + 更新索引
                             force_sync_delete(cid, user_id)
                             self._send_json({'status': 'ok'})
                         else:

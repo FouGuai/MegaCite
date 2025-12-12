@@ -34,12 +34,24 @@ class HTMLRenderer:
         else:
             self.template_settings = "<h1>Settings</h1>"
 
+        # [新增] 加载编辑器模版
+        editor_path = os.path.join(template_dir, "editor.html")
+        if os.path.exists(editor_path):
+            with open(editor_path, "r", encoding="utf-8") as f:
+                self.template_editor = f.read()
+        else:
+            self.template_editor = "<h1>Editor Template Missing</h1>"
+
     def render_landing_page(self) -> str:
         return self.template_home
 
     def render_settings_page(self) -> str:
         return self.template_settings
         
+    def render_editor_page(self) -> str:
+        # 编辑器是一个通用页面，数据通过 API 加载
+        return self.template_editor
+
     def render_admin_stub(self) -> str:
         return """
         <!DOCTYPE html>
@@ -59,8 +71,6 @@ class HTMLRenderer:
             posts = categorized_posts[category]
             items = []
             for p in posts:
-                # [修改] 重构 post-item 结构以支持删除按钮
-                # 使用 div 包装，分离链接和按钮
                 item_html = f"""
                 <div class="post-item-container">
                     <a href="{p['filename']}" class="post-item-link">
@@ -91,19 +101,6 @@ class HTMLRenderer:
             </div>
             """
             parts.append(section_html)
-        
-        # 将 cid 传递给 render_post 方法没有用，这里是 index 页
-        # 但是我们在 loop 中已经拿到了 p['cid'] (假设 sync_user_index 传了 cid)
-        # 让我们确认一下 sync_user_index 的逻辑是否传了 cid。
-        # builder.py -> sync_user_index: categorized[p_cat].append({ "title": ..., "cid": p_cid ... })
-        # 我需要检查 builder.py 是否添加了 cid 到 dict 中。
-        # 现在的 builder.py 代码中：
-        # categorized[p_cat].append({ "title": p_title, "filename": link_href, "date": str(p_date) })
-        # 缺少 cid。我必须修改 builder.py 或者在这里假设它有。
-        # 由于我不能一次改所有文件，我会在 builder.py 中添加 cid。
-        # 既然 builder.py 也在上下文中，我可以在思考中确认，或者我现在就修改 builder.py。
-        # 看起来 builder.py 是在上一次上传的文件列表中。
-        # 我将需要在本次回复中包含 builder.py 的修改。
         
         return self.template_index.format(
             username=username,

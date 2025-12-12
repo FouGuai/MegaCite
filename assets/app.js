@@ -43,11 +43,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCancelDelete = document.getElementById('btn-cancel-delete');
     let deleteTargetCid = null;
 
+    // Editor Elements
+    const editTitle = document.getElementById('edit-title');
+    const editDescription = document.getElementById('edit-description'); // [新增]
+    const editCategorySelect = document.getElementById('edit-category-select');
+    const editCategoryInput = document.getElementById('edit-category-input');
+    const editPreview = document.getElementById('edit-preview');
+    const btnSavePost = document.getElementById('btn-save');
+    const btnBack = document.getElementById('btn-back');
+    const btnEditTrigger = document.getElementById('btn-edit-trigger');
+    const monacoContainer = document.getElementById('monaco-container');
+
     // State Variables
     let currentSessionId = null;
-    let authEventSource = null; // [New] SSE Connection
+    let authEventSource = null; 
     let isRegisterMode = false;
     let migrateAbortController = null; 
+    let editorInstance = null; // Monaco Instance
+    let isEditorDirty = false; // 未保存标记
 
     // Icons for Password Toggle
     const iconEye = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
@@ -97,7 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
-    // Check for pending toast on load (Post-Refresh strategy)
     const pendingToast = localStorage.getItem('mc_pending_toast');
     if (pendingToast) {
         showToast(pendingToast);
@@ -113,15 +125,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if(usernameDisplay) usernameDisplay.textContent = username;
             if(linkMyHome) linkMyHome.href = `/${username}/index.html`;
             
+            // 1. 首页控制台逻辑
             const pageOwnerMeta = document.querySelector('meta[name="page-owner"]');
             if (pageOwnerMeta && dashboardActions) {
                 const pageOwner = pageOwnerMeta.getAttribute('content');
                 if (pageOwner === username) {
                     dashboardActions.style.display = 'flex';
-                    // 显示删除按钮
                     document.querySelectorAll('.btn-delete-post').forEach(btn => {
                         btn.style.display = 'block';
                     });
+                }
+            }
+
+            // 2. 文章页编辑按钮逻辑
+            const postAuthorMeta = document.querySelector('meta[name="post-author"]');
+            if (postAuthorMeta && btnEditTrigger) {
+                const postAuthor = postAuthorMeta.getAttribute('content');
+                if (postAuthor === username) {
+                    btnEditTrigger.style.display = 'inline-flex';
+                    const cid = document.querySelector('meta[name="post-cid"]').getAttribute('content');
+                    
+                    btnEditTrigger.onclick = () => {
+                        window.location.href = `/edit.html?cid=${cid}`;
+                    };
                 }
             }
 
@@ -197,6 +223,253 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     updateUI();
+
+    // --- Editor Logic (Monaco + Sync) ---
+    if (monacoContainer) {
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
+
+        const params = new URLSearchParams(window.location.search);
+        const cid = params.get('cid');
+        
+        if (!cid) {
+            showToast('参数错误: 缺少 CID');
+            return;
+        }
+
+        const markDirty = () => {
+            if (!isEditorDirty) {
+                isEditorDirty = true;
+                document.title = "编辑器 * - MegaCite";
+            }
+        };
+
+        const markClean = () => {
+            isEditorDirty = false;
+            document.title = "编辑器 - MegaCite";
+        };
+
+        // 监听基础输入框变化
+        editTitle.addEventListener('input', markDirty);
+        if (editDescription) editDescription.addEventListener('input', markDirty);
+        editCategorySelect.addEventListener('change', markDirty);
+        editCategoryInput.addEventListener('input', markDirty);
+
+        // 拦截退出行为
+        window.addEventListener('beforeunload', (e) => {
+            if (isEditorDirty) {
+                e.preventDefault();
+                e.returnValue = ''; 
+            }
+        });
+
+        // Initialize Monaco and Data
+        require(['vs/editor/editor.main'], async () => {
+            try {
+                // 1. 获取文章详情
+                const postRes = await fetch(`/api/post/detail?cid=${cid}`, {
+                    headers: { 'Authorization': localStorage.getItem('mc_token') }
+                });
+                if (!postRes.ok) throw new Error("加载文章失败");
+                const postData = await postRes.json();
+
+                // 2. 获取分类列表
+                const catRes = await fetch('/api/categories');
+                const catData = await catRes.json();
+                
+                // 填充 Select
+                const categories = catData.categories || [];
+                const validCats = categories.filter(c => c !== 'Default' && c !== '__NEW__');
+                
+                editCategorySelect.innerHTML = `<option value="Default">Default</option>`;
+                validCats.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat;
+                    opt.textContent = cat;
+                    editCategorySelect.appendChild(opt);
+                });
+                editCategorySelect.innerHTML += `<option value="__NEW__" style="font-weight:bold;color:var(--vp-c-brand)">+ 新建分类...</option>`;
+
+                // 设置初始值
+                editTitle.value = postData.title || '';
+                if (editDescription) editDescription.value = postData.description || '';
+                
+                if (validCats.includes(postData.category)) {
+                    editCategorySelect.value = postData.category;
+                } else if (postData.category !== 'Default') {
+                    const opt = document.createElement('option');
+                    opt.value = postData.category;
+                    opt.textContent = postData.category;
+                    editCategorySelect.insertBefore(opt, editCategorySelect.lastElementChild);
+                    editCategorySelect.value = postData.category;
+                } else {
+                    editCategorySelect.value = 'Default';
+                }
+
+                // 3. 创建 Monaco 实例
+                editorInstance = monaco.editor.create(monacoContainer, {
+                    value: postData.context || '',
+                    language: 'markdown',
+                    theme: 'vs', 
+                    automaticLayout: true,
+                    wordWrap: 'on',
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    padding: { top: 20, bottom: 20 },
+                    scrollBeyondLastLine: false,
+                    // [修改] 确保使用等宽字体
+                    fontFamily: "'Roboto Mono', 'Menlo', 'Monaco', 'Courier New', monospace"
+                });
+
+                // 4. 初始预览渲染
+                if (window.marked) {
+                    editPreview.innerHTML = marked.parse(postData.context || '');
+                }
+
+                // 5. 实时预览 + 滚动同步事件
+                editorInstance.onDidChangeModelContent(() => {
+                    markDirty(); // 标记变动
+                    const newVal = editorInstance.getValue();
+                    if (window.marked) {
+                        editPreview.innerHTML = marked.parse(newVal);
+                    }
+                });
+
+                // [滚动同步逻辑] 使用 Lodash throttle 节流
+                const syncPreviewScroll = _.throttle(() => {
+                    const editorScrollTop = editorInstance.getScrollTop();
+                    const editorScrollHeight = editorInstance.getScrollHeight();
+                    const editorViewportHeight = editorInstance.getLayoutInfo().height;
+                    
+                    const scrollPercentage = editorScrollTop / (editorScrollHeight - editorViewportHeight);
+                    
+                    const previewScrollHeight = editPreview.scrollHeight;
+                    const previewViewportHeight = editPreview.clientHeight;
+                    
+                    editPreview.scrollTop = scrollPercentage * (previewScrollHeight - previewViewportHeight);
+                }, 20); 
+
+                const syncEditorScroll = _.throttle(() => {
+                    const previewScrollTop = editPreview.scrollTop;
+                    const previewScrollHeight = editPreview.scrollHeight;
+                    const previewViewportHeight = editPreview.clientHeight;
+                    
+                    const scrollPercentage = previewScrollTop / (previewScrollHeight - previewViewportHeight);
+                    
+                    const editorScrollHeight = editorInstance.getScrollHeight();
+                    const editorViewportHeight = editorInstance.getLayoutInfo().height;
+                    
+                    editorInstance.setScrollTop(scrollPercentage * (editorScrollHeight - editorViewportHeight));
+                }, 20);
+
+                let isEditorScrolling = false;
+                let isPreviewScrolling = false;
+
+                editorInstance.onDidScrollChange((e) => {
+                    if (!e.scrollTopChanged) return;
+                    if (isPreviewScrolling) return; 
+                    isEditorScrolling = true;
+                    syncPreviewScroll();
+                    setTimeout(() => isEditorScrolling = false, 50);
+                });
+
+                editPreview.addEventListener('scroll', () => {
+                    if (isEditorScrolling) return;
+                    isPreviewScrolling = true;
+                    syncEditorScroll();
+                    setTimeout(() => isPreviewScrolling = false, 50);
+                });
+
+            } catch (e) {
+                console.error(e);
+                showToast(e.message);
+                setTimeout(() => window.location.href = '/', 1500);
+            }
+        });
+
+        editCategorySelect.addEventListener('change', () => {
+            if (editCategorySelect.value === '__NEW__') {
+                editCategorySelect.style.display = 'none';
+                editCategoryInput.style.display = 'block';
+                editCategoryInput.focus();
+            }
+        });
+
+        editCategoryInput.addEventListener('blur', () => {
+            if (!editCategoryInput.value.trim()) {
+                editCategoryInput.style.display = 'none';
+                editCategorySelect.style.display = 'block';
+                editCategorySelect.value = 'Default';
+            }
+        });
+
+        btnSavePost.addEventListener('click', async () => {
+            if (!editorInstance) return;
+
+            const title = editTitle.value.trim();
+            const description = editDescription ? editDescription.value.trim() : '';
+            const context = editorInstance.getValue();
+            let category = editCategorySelect.value;
+            
+            if (editCategoryInput.style.display !== 'none') {
+                category = editCategoryInput.value.trim();
+            }
+
+            if (!title) return showToast('标题不能为空');
+            if (category === '__NEW__' || !category) category = 'Default';
+
+            btnSavePost.textContent = '保存中...';
+            btnSavePost.disabled = true;
+
+            try {
+                const res = await fetch('/api/post/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': localStorage.getItem('mc_token')
+                    },
+                    body: JSON.stringify({
+                        cid: cid,
+                        title: title,
+                        category: category,
+                        context: context,
+                        description: description
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    markClean(); // 标记已保存
+                    
+                    showToast('保存成功，正在跳转...');
+                    setTimeout(() => {
+                        // [修改] 跳转到文章页
+                        if (data.url) {
+                            window.location.href = data.url;
+                        } else {
+                            window.location.href = `/${localStorage.getItem('mc_username')}/index.html`; 
+                        }
+                    }, 1000);
+                } else {
+                    const err = await res.json();
+                    showToast('保存失败: ' + (err.error || '未知错误'));
+                    btnSavePost.textContent = '保存文章';
+                    btnSavePost.disabled = false;
+                }
+            } catch (e) {
+                showToast('网络错误');
+                btnSavePost.textContent = '保存文章';
+                btnSavePost.disabled = false;
+            }
+        });
+
+        // [修改] 返回按钮逻辑：检查是否未保存
+        btnBack.addEventListener('click', () => {
+            if (isEditorDirty) {
+                if (!confirm("您有未保存的更改，确定要离开吗？")) return;
+            }
+            window.history.back();
+        });
+    }
 
     // --- Delete Post Logic ---
     document.querySelectorAll('.btn-delete-post').forEach(btn => {
@@ -277,7 +550,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (res.ok) {
                     success = true;
-                    showToast('创建成功，正在跳转...');
+                    // showToast('创建成功，正在跳转...'); // Remove or keep
+                    localStorage.setItem('mc_pending_toast', '文章创建成功！'); // Add this
                     location.reload(); 
                 } else {
                     showToast('创建失败');
@@ -527,14 +801,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // [Modification] Logout immediately reloads page
     if (btnLogout) {
         btnLogout.addEventListener('click', (e) => {
             e.preventDefault();
             localStorage.removeItem('mc_token');
             localStorage.removeItem('mc_username');
             document.cookie = "mc_token=; path=/; max-age=0";
-            updateUI();
-            if (window.location.pathname.includes('settings')) window.location.href = '/';
+            
+            if (window.location.pathname.includes('settings') || window.location.pathname.includes('edit')) {
+                window.location.href = '/';
+            } else {
+                location.reload();
+            }
         });
     }
 

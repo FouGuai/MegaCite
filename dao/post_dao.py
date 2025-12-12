@@ -4,7 +4,6 @@ import pymysql.connections
 class MySQLPostDAO:
     """MySQL 实现的 PostDAO。"""
 
-    # [修改] 添加 owner_id 到允许读取的字段列表
     ALLOWED_FIELDS = {"context", "title", "date", "description", "category", "owner_id"}
 
     def __init__(self, conn: pymysql.connections.Connection):
@@ -112,3 +111,10 @@ class MySQLPostDAO:
                     results.append(cid)
 
         return results
+
+    def get_all_categories(self) -> list[str]:
+        """[新增] 获取所有去重的分类列表"""
+        with self.conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT category FROM posts ORDER BY category")
+            rows = cur.fetchall()
+        return [r[0] for r in rows] if rows else []

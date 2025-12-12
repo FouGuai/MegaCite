@@ -64,6 +64,85 @@ def post_create(token: str) -> str:
     finally:
         conn.close()
 
+def post_get_full(token: str, cid: str) -> dict:
+    """获取文章的完整信息，用于编辑"""
+    user_id = verify_token(token)
+    conn = create_connection()
+    try:
+        dao = MySQLPostDAO(conn)
+        
+        # 检查所有权
+        owner_id = dao.get_field(cid, "owner_id")
+        if owner_id != user_id:
+            raise PermissionError("Access denied")
+            
+        title = dao.get_field(cid, "title")
+        category = dao.get_field(cid, "category")
+        context = dao.get_field(cid, "context")
+        description = dao.get_field(cid, "description") # [新增] 获取摘要
+        
+        return {
+            "cid": cid,
+            "title": title,
+            "category": category,
+            "context": context,
+            "description": description
+        }
+    finally:
+        conn.close()
+
+def post_update_content(token: str, cid: str, title: str, category: str, context: str, description: str) -> bool:
+    """
+    [新增] 同时更新文章的标题、分类、内容和摘要。
+    处理冲突逻辑。
+    """
+    user_id = verify_token(token)
+    conn = create_connection()
+    try:
+        dao = MySQLPostDAO(conn)
+        
+        # 检查所有权
+        owner_id = dao.get_field(cid, "owner_id")
+        if owner_id != user_id:
+            raise PermissionError("Access denied")
+
+        # 尝试更新
+        target_title = title
+        target_cat = category
+        resolved = False
+        
+        # 循环尝试解决标题冲突
+        while True:
+            # 解析当前尝试的标题，检查是否已有 (n) 后缀
+            match = re.search(r" \(([1-9]\d*)\)$", target_title)
+            if match:
+                n = int(match.group(1))
+                prefix = target_title[:match.start()]
+                target_title = f"{prefix} ({n+1})"
+            
+            try:
+                dao.update_post_fields(
+                    cid, 
+                    title=target_title, 
+                    category=target_cat, 
+                    context=context,
+                    description=description # [新增] 更新摘要
+                )
+                resolved = True
+                break
+            except pymysql.err.IntegrityError:
+                # 冲突，给标题加后缀重试
+                if not match:
+                    target_title = f"{target_title} (1)"
+                continue
+        
+        if resolved:
+            _update_url_mapping(conn, cid)
+            
+        return resolved
+    finally:
+        conn.close()
+
 def post_update(token: str, cid: str, field: str, value: str) -> bool:
     verify_token(token)
     conn = create_connection()

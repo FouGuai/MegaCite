@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑器 - MegaCite</title>
+    <link href="/style.css" rel="stylesheet">
+    
+    <!-- Marked.js 用于预览 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <!-- Lodash 用于防抖/节流 (滚动同步必须) -->
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+
+    <!-- Monaco Editor Loader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+    <!-- [修改] 背景色调整为 var(--vp-c-bg) 即白色 -->
+    <div class="layout" style="height: 100vh; overflow: hidden; background-color: var(--vp-c-bg);">
+        <header class="VPNav">
+            <div class="VPNavBar">
+                <!-- 左侧不可点击 -->
+                <div class="title-container disabled">
+                    <img src="/logo.svg" alt="M" class="logo">
+                    <span>MegaCite Editor</span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-back" class="btn-action cancel">返回</button>
+                    <button id="btn-save" class="btn-action primary">保存文章</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="editor-layout">
+            <div class="editor-toolbar">
+                <!-- [修改] 标题和摘要宽度相等，均设为 flex: 1 -->
+                <div class="toolbar-group" style="flex: 1;">
+                    <span class="toolbar-label">标题：</span>
+                    <input id="edit-title" class="editor-input title" type="text" placeholder="输入文章标题">
+                </div>
+
+                <div class="toolbar-group" style="flex: 1;">
+                    <span class="toolbar-label">摘要：</span>
+                    <input id="edit-description" class="editor-input" type="text" placeholder="文章摘要">
+                </div>
+                
+                <!-- 限制分类栏宽度 -->
+                <div class="toolbar-group" style="flex: 0 0 200px;"> 
+                    <span class="toolbar-label">分类：</span>
+                    <div id="category-container" style="flex: 1; display: flex;">
+                        <select id="edit-category-select" class="editor-input category">
+                            <option value="Default">Default</option>
+                            <option value="__NEW__">+ 新建分类...</option>
+                        </select>
+                        <input id="edit-category-input" class="editor-input category" type="text" placeholder="输入新分类名称" style="display: none;">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="editor-main">
+                <!-- 源码区域 (Block) -->
+                <div class="editor-block">
+                    <div id="monaco-container"></div>
+                </div>
+                <!-- 预览区域 (Block) -->
+                <div class="editor-block">
+                    <div id="edit-preview" class="post-content preview-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container"></div>
+    <script src="/app.js"></script>
+</body>
+</html>
