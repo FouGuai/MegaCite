@@ -3,39 +3,42 @@ from core.auth import verify_token
 from core.post import post_create, post_update
 from crawler.fetcher import fetch_html
 from crawler.converter import convert_html_to_markdown
-# 引入验证管理器
 from verification import manager as verify_manager
 
-def migrate_post_from_url(token: str, url: str) -> str:
-    """执行迁移：验证 -> 下载 -> 转换 -> 入库"""
-    
-    # 1. 执行严格的所有权验证 (先于 Token 验证)
-    print(f"[*] Verifying ownership for {url}...")
-    if not verify_manager.verify_url_owner(url):
+def migrate_post_from_url(token: str, url: str, progress_callback=None) -> str:
+    def report(msg):
+        print(msg)
+        if progress_callback: progress_callback(msg)
+
+    # 1. 先验证 Token 获取 User ID (用于加载隔离的 Cookie)
+    user_id = verify_token(token)
+
+    # 2. 执行所有权验证
+    report(f"[*] Verifying ownership for {url}...")
+    if not verify_manager.verify_url_owner(url, user_id):
         raise PermissionError(
             "Ownership verification failed.\n"
             "Possible reasons:\n"
             "  1. You are not the author of this post.\n"
-            "  2. Your local cookie has expired (Try 'mc auth add <platform>' again).\n"
-            "  3. Network issues or platform anti-bot protection blocked the verification probe.\n"
-            "  4. Page structure changed (Please check logs above)."
+            "  2. Your local cookie has expired (Try re-binding in Settings).\n"
+            "  3. Platform protection blocked the probe."
         )
-    print(f"[+] Ownership confirmed.")
-
-    # 2. 验证系统 Token
-    verify_token(token)
+    report(f"[+] Ownership confirmed.")
 
     # 3. 获取源码
-    print(f"[*] Fetching {url}...")
-    html = fetch_html(url)
+    report(f"[*] Fetching content from {url}...")
+    # [修复] 传递 user_id
+    html = fetch_html(url, user_id)
     if not html:
         raise ValueError("Failed to fetch content.")
 
     # 4. AI 转换
-    print(f"[*] Analyzing with AI...")
+    report(f"[*] Analyzing and converting with AI...")
     data = convert_html_to_markdown(html)
+    report(f"[+] Content converted successfully.")
 
     # 5. 创建文章
+    report(f"[*] Creating post in database...")
     cid = post_create(token)
     
     # 6. 更新字段
@@ -52,7 +55,8 @@ def migrate_post_from_url(token: str, url: str) -> str:
         post_update(token, cid, "date", dt)
         post_update(token, cid, "context", context)
         
+        report(f"[+] Migration complete! CID: {cid}")
         return cid
     except Exception as e:
-        print(f"[-] Warning: Partial update failed: {e}")
+        report(f"[-] Warning: Partial update failed: {e}")
         return cid

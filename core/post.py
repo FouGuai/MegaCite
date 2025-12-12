@@ -1,4 +1,5 @@
 from typing import Any
+import re
 import pymysql.err
 from dao import MySQLPostDAO, MySQLUrlMapDAO, MySQLUserDAO
 from dao.factory import create_connection
@@ -25,7 +26,7 @@ def _update_url_mapping(conn, cid: str):
 
     mgr = URLManager()
     safe_title = mgr.safe_title(title or "untitled")
-    safe_cat = mgr.safe_title(category or "default")
+    safe_cat = mgr.safe_title(category or "Default")
 
     # 构造新路径结构: /username/category/title.html
     url_path = f"/{username}/{safe_cat}/{safe_title}.html"
@@ -49,7 +50,8 @@ def post_create(token: str) -> str:
     
     # 自动生成唯一默认标题: Untitled-{CID}
     default_title = f"Untitled-{new_cid}"
-    default_cat = "default"
+    # [Modify] Capitalize Default
+    default_cat = "Default"
     
     conn = create_connection()
     try:
@@ -70,10 +72,60 @@ def post_update(token: str, cid: str, field: str, value: str) -> bool:
         dao = MySQLPostDAO(conn)
         
         try:
+            # 尝试正常更新
             result = dao.update_field(cid, field, value)
         except pymysql.err.IntegrityError:
-            # 捕获违反唯一性约束 (IntegrityError)，即 Category+Title 重复
-            return False
+            # [冲突解决策略]
+            # 违反了 (owner_id, category, title) 的唯一约束
+            # 需要自动重命名标题以解决冲突
+            
+            # 1. 获取当前的 title 和 category
+            # 注意：如果是更新 category 导致的冲突，value 是新 category，我们需要修改 title 以适应新 category
+            # 如果是更新 title 导致的冲突，value 是新 title，我们需要修改这个新 title
+            
+            current_title = dao.get_field(cid, "title")
+            current_cat = dao.get_field(cid, "category")
+            
+            target_title = value if field == "title" else current_title
+            target_cat = value if field == "category" else current_cat
+            
+            print(f"[Conflict] Collision detected for '{target_title}' in '{target_cat}'. Auto-resolving...")
+
+            # 2. 循环尝试生成不冲突的标题: "Title (1)", "Title (2)" ...
+            # 简单的死循环重试，直到成功
+            base_title = target_title
+            resolved = False
+            
+            while True:
+                # 解析当前尝试的标题，检查是否已有 (n) 后缀
+                match = re.search(r" \(([1-9]\d*)\)$", target_title)
+                if match:
+                    n = int(match.group(1))
+                    prefix = target_title[:match.start()]
+                    target_title = f"{prefix} ({n+1})"
+                else:
+                    target_title = f"{target_title} (1)"
+                
+                try:
+                    # 尝试同时更新字段
+                    # 如果 field 是 category，我们必须同时更新 title (变了) 和 category (变了)
+                    # 如果 field 是 title，我们只更新 title (变了)
+                    
+                    update_payload = {}
+                    if field == "category":
+                        update_payload = {"category": target_cat, "title": target_title}
+                    else:
+                        update_payload = {"title": target_title}
+                    
+                    dao.update_post_fields(cid, **update_payload)
+                    resolved = True
+                    print(f"[Conflict] Resolved to: '{target_title}'")
+                    break
+                except pymysql.err.IntegrityError:
+                    # 仍然冲突 (例如 Title (1) 也存在)，继续循环 n+1
+                    continue
+            
+            result = resolved
         
         # 只要修改了 title 或 category，就需要重新生成 URL
         if result and field in ("title", "category"):

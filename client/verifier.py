@@ -108,8 +108,9 @@ class VerificationHandler(BaseHTTPRequestHandler):
             
             print(f"[+] Login successful for {platform}")
             
-            # 获取保存的 Cookies
-            cookies = load_cookies(platform)
+            # [关键修复] 获取本地保存的 Cookies，本地客户端默认 User ID 为 0
+            cookies = load_cookies(0, platform)
+            
             if not cookies:
                 print(f"[-] No cookies found after login")
                 VerificationHandler._report_error(session_id, server_url, "No cookies found")

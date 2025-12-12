@@ -9,16 +9,66 @@ from generator.builder import StaticSiteGenerator
 from generator.watcher import DBWatcher
 from dao.factory import create_connection
 from dao.auth_dao import MySQLAuthDAO
+from dao.post_dao import MySQLPostDAO
+from dao.user_dao import MySQLUserDAO
 from core.auth import user_login, user_register, change_password, verify_token
+from core.post import post_create
+from crawler.service import migrate_post_from_url
 from verification import manager as verify_manager
 
 PID_FILE = "server.pid"
 WEB_ROOT = "public"
 
+# [Global Generator Instance]
+SERVER_GEN = None
+
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
+def force_sync_post(cid: str, user_id: int):
+    """
+    [同步渲染逻辑]
+    强制从数据库拉取最新数据，并调用 Generator 生成 HTML。
+    确保 API 返回前，静态文件已经就绪。
+    """
+    if not SERVER_GEN: return
+
+    conn = create_connection()
+    try:
+        # 1. 获取文章数据
+        post_dao = MySQLPostDAO(conn)
+        title = post_dao.get_field(cid, "title")
+        category = post_dao.get_field(cid, "category")
+        date = post_dao.get_field(cid, "date")
+        context = post_dao.get_field(cid, "context")
+        desc = post_dao.get_field(cid, "description")
+        
+        post_data = {
+            "cid": cid,
+            "title": title,
+            "category": category,
+            "date": str(date),
+            "context": context,
+            "description": desc
+        }
+        
+        # 2. 获取用户名
+        user_dao = MySQLUserDAO(conn)
+        user = user_dao.get_user_by_id(user_id)
+        if not user: return
+        username = user.username
+        
+        # 3. 立即生成文章页和索引页
+        print(f"[Sync] Force generating files for {cid}...")
+        SERVER_GEN.sync_post_file(post_data, username)
+        SERVER_GEN.sync_user_index(user_id)
+        print(f"[Sync] Done.")
+    finally:
+        conn.close()
+
 def server_start(port: int) -> None:
+    global SERVER_GEN
+    
     try:
         conn = create_connection()
         conn.ping()
@@ -31,8 +81,10 @@ def server_start(port: int) -> None:
         f.write(str(os.getpid()))
 
     os.makedirs(WEB_ROOT, exist_ok=True)
-    gen = StaticSiteGenerator(WEB_ROOT)
-    watcher = DBWatcher(gen)
+    
+    # 初始化全局 Generator
+    SERVER_GEN = StaticSiteGenerator(WEB_ROOT)
+    watcher = DBWatcher(SERVER_GEN)
     
     t_watcher = threading.Thread(target=watcher.start, args=(3,), daemon=True)
     t_watcher.start()
@@ -62,6 +114,14 @@ def server_start(port: int) -> None:
                 pass
             return False
 
+        def _get_token(self):
+            token = self.headers.get('Authorization')
+            if not token and "Cookie" in self.headers:
+                cookie = http.cookies.SimpleCookie(self.headers["Cookie"])
+                if "mc_token" in cookie:
+                    token = cookie["mc_token"].value
+            return token
+
         def do_GET(self):
             # 拦截 settings.html，未登录直接返回 404 Not Found
             if self.path == '/settings.html' or self.path.startswith('/settings.html?'):
@@ -76,12 +136,7 @@ def server_start(port: int) -> None:
             # API: 获取当前用户的绑定列表
             if parsed_path.path == '/api/auth/bindings':
                 try:
-                    token = self.headers.get('Authorization')
-                    if not token and "Cookie" in self.headers:
-                        cookie = http.cookies.SimpleCookie(self.headers["Cookie"])
-                        if "mc_token" in cookie:
-                            token = cookie["mc_token"].value
-                            
+                    token = self._get_token()
                     user_id = verify_token(token)
                     conn = create_connection()
                     dao = MySQLAuthDAO(conn)
@@ -116,112 +171,139 @@ def server_start(port: int) -> None:
                 
                 if self.path == '/api/login':
                     token = user_login(data.get('username'), data.get('password'))
+                    
+                    # [关键修改] 登录成功后，立即同步生成用户的 index.html
+                    # 确保前端跳转时页面已就绪
+                    try:
+                        user_id = verify_token(token)
+                        if SERVER_GEN:
+                            print(f"[*] Login Sync: Generating index for user {user_id}")
+                            SERVER_GEN.sync_user_index(user_id)
+                    except Exception as e:
+                        print(f"[-] Login Sync Failed: {e}")
+
                     self._send_json({'token': token})
                 
                 elif self.path == '/api/register':
-                    # 注册并获取 UserID
                     uid = user_register(data.get('username'), data.get('password'))
-                    
-                    # [修复] 注册成功后立即生成用户首页
-                    # 避免前端跳转时出现 404
+                    # 注册也同步生成一下
                     try:
-                        gen = StaticSiteGenerator(WEB_ROOT)
-                        gen.sync_user_index(uid)
-                        print(f"[*] Initial index generated for user {uid}")
-                    except Exception as gen_err:
-                        print(f"[-] Failed to generate initial index: {gen_err}")
-                    
+                        if SERVER_GEN:
+                            SERVER_GEN.sync_user_index(uid)
+                    except Exception:
+                        pass
                     self._send_json({'status': 'ok'})
                 
                 elif self.path == '/api/change_password':
-                    token = self.headers.get('Authorization')
-                    change_password(token, data.get('old_password'), data.get('new_password'))
-                    self._send_json({'status': 'ok'})
+                    try:
+                        token = self._get_token()
+                        change_password(token, data.get('old_password'), data.get('new_password'))
+                        self._send_json({'status': 'ok'})
+                    except ValueError as ve:
+                        self.send_response(400)
+                        self.send_header('Content-type', 'application/json')
+                        self.end_headers()
+                        self.wfile.write(json.dumps({'error': str(ve)}).encode())
+                        return
+
+                # --- 文章管理 APIs ---
+                elif self.path == '/api/post/create':
+                    try:
+                        token = self._get_token()
+                        user_id = verify_token(token)
+                        cid = post_create(token)
+                        
+                        # [同步] 强制生成文件
+                        force_sync_post(cid, user_id)
+                        
+                        self._send_json({'status': 'ok', 'cid': cid})
+                    except Exception as e:
+                         self.send_error(400, str(e))
+
+                elif self.path == '/api/post/migrate':
+                    try:
+                        token = self._get_token()
+                        user_id = verify_token(token)
+                        url = data.get('url')
+                        
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'text/event-stream')
+                        self.send_header('Cache-Control', 'no-cache')
+                        self.send_header('Connection', 'keep-alive')
+                        self.end_headers()
+
+                        def progress_callback(msg):
+                            try:
+                                payload = json.dumps({'step': msg})
+                                self.wfile.write(f"data: {payload}\n\n".encode('utf-8'))
+                                self.wfile.flush()
+                            except Exception:
+                                pass
+
+                        try:
+                            cid = migrate_post_from_url(token, url, progress_callback)
+                            
+                            # [同步] 强制生成文件
+                            progress_callback("[*] Finalizing: Generating static pages...")
+                            force_sync_post(cid, user_id)
+                            
+                            success_payload = json.dumps({'success': True, 'cid': cid})
+                            self.wfile.write(f"data: {success_payload}\n\n".encode('utf-8'))
+                        except Exception as e:
+                            error_payload = json.dumps({'error': str(e)})
+                            self.wfile.write(f"data: {error_payload}\n\n".encode('utf-8'))
+                        
+                        self.wfile.flush()
+                        return
+
+                    except Exception as e:
+                        self.send_error(400, str(e))
+                        return
                 
                 # --- 验证会话 APIs ---
                 elif self.path == '/api/auth/init':
-                    """初始化验证会话"""
-                    try:
-                        token = self.headers.get('Authorization')
-                        if not token and "Cookie" in self.headers:
-                            cookie = http.cookies.SimpleCookie(self.headers["Cookie"])
-                            if "mc_token" in cookie:
-                                token = cookie["mc_token"].value
-                        
-                        user_id = verify_token(token)
-                        platform = data.get('platform')
-                        session_id = verify_manager.session_init(user_id, platform)
-                        
-                        if session_id:
-                            self._send_json({
-                                'session_id': session_id,
-                                'status': 'initialized',
-                                'platform': platform,
-                            })
-                        else:
-                            self.send_error(400, "Failed to initialize session")
-                    except Exception as e:
-                        self.send_error(400, str(e))
+                    token = self._get_token()
+                    user_id = verify_token(token)
+                    platform = data.get('platform')
+                    session_id = verify_manager.session_init(user_id, platform)
+                    if session_id:
+                        self._send_json({'session_id': session_id, 'status': 'initialized'})
+                    else:
+                        self.send_error(400, "Failed")
                 
                 elif self.path == '/api/auth/save_cookies':
-                    """本地客户端发送已验证的 Cookies"""
-                    try:
-                        session_id = data.get('session_id')
-                        cookies = data.get('cookies', [])
-                        
-                        if verify_manager.session_save_cookies(session_id, cookies):
-                            self._send_json({'status': 'ok'})
-                        else:
-                            self.send_error(400, "Failed to save cookies")
-                    except Exception as e:
-                        self.send_error(400, str(e))
+                    session_id = data.get('session_id')
+                    cookies = data.get('cookies', [])
+                    if verify_manager.session_save_cookies(session_id, cookies):
+                        self._send_json({'status': 'ok'})
+                    else:
+                        self.send_error(400, "Failed")
                 
                 elif self.path == '/api/auth/save_error':
-                    """本地客户端报告验证错误"""
-                    try:
-                        session_id = data.get('session_id')
-                        error_msg = data.get('error')
-                        
-                        verify_manager.session_save_error(session_id, error_msg)
-                        self._send_json({'status': 'ok'})
-                    except Exception as e:
-                        self.send_error(400, str(e))
+                    session_id = data.get('session_id')
+                    error_msg = data.get('error')
+                    verify_manager.session_save_error(session_id, error_msg)
+                    self._send_json({'status': 'ok'})
                 
                 elif self.path == '/api/auth/cancel':
-                    """取消验证会话"""
-                    try:
-                        session_id = data.get('session_id')
-                        verify_manager.session_close(session_id)
-                        self._send_json({'status': 'cancelled'})
-                    except Exception as e:
-                        self.send_error(400, str(e))
+                    session_id = data.get('session_id')
+                    verify_manager.session_close(session_id)
+                    self._send_json({'status': 'cancelled'})
 
                 elif self.path == '/api/auth/unbind':
-                    """解除绑定"""
-                    try:
-                        token = self.headers.get('Authorization')
-                        if not token and "Cookie" in self.headers:
-                            cookie = http.cookies.SimpleCookie(self.headers["Cookie"])
-                            if "mc_token" in cookie:
-                                token = cookie["mc_token"].value
-                        
-                        user_id = verify_token(token)
-                        platform = data.get('platform')
-                        
-                        conn = create_connection()
-                        try:
-                            dao = MySQLAuthDAO(conn)
-                            dao.remove_platform_auth(user_id, platform)
-                        finally:
-                            conn.close()
-                        
-                        self._send_json({'status': 'ok'})
-                    except Exception as e:
-                        self.send_error(400, str(e))
+                    token = self._get_token()
+                    user_id = verify_token(token)
+                    platform = data.get('platform')
+                    conn = create_connection()
+                    dao = MySQLAuthDAO(conn)
+                    dao.remove_platform_auth(user_id, platform)
+                    conn.close()
+                    self._send_json({'status': 'ok'})
 
                 else:
                     self.send_error(404)
             except Exception as e:
+                print(f"Server Error: {e}")
                 self.send_response(400)
                 self.wfile.write(json.dumps({'error': str(e)}).encode())
 

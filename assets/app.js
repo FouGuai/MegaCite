@@ -15,18 +15,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabRegister = document.getElementById('tab-register');
 
     const qrModal = document.getElementById('qr-modal');
-    const qrImage = document.getElementById('qr-image');
-    const qrLoading = document.getElementById('qr-loading');
     const btnCancelQr = document.getElementById('btn-cancel-qr');
+
+    const settingsForm = document.getElementById('settings-form');
+    const inpOldPass = document.getElementById('inp-old-pass');
+    const inpNewPass = document.getElementById('inp-new-pass');
+
+    // Dashboard Elements
+    const dashboardActions = document.getElementById('dashboard-actions');
+    const btnCreatePost = document.getElementById('btn-create-post');
+    const btnMigrateTrigger = document.getElementById('btn-migrate-trigger');
+    
+    // Migrate Modal Elements
+    const migrateModal = document.getElementById('migrate-modal');
+    const inpMigrateUrl = document.getElementById('inp-migrate-url');
+    const btnStartMigrate = document.getElementById('btn-start-migrate');
+    const btnCancelMigrate = document.getElementById('btn-cancel-migrate');
+    const btnStopMigrate = document.getElementById('btn-stop-migrate'); 
+    const migrateInputArea = document.getElementById('migrate-input-area');
+    const migrateProgressArea = document.getElementById('migrate-progress-area');
+    const migrateLogs = document.getElementById('migrate-logs');
+    const btnCloseMigrate = document.getElementById('btn-close-migrate');
     
     // State Variables
     let isAuthPolling = false;
     let currentSessionId = null;
     let isRegisterMode = false;
+    let migrateAbortController = null; 
 
-    const settingsForm = document.getElementById('settings-form');
-    const inpOldPass = document.getElementById('inp-old-pass');
-    const inpNewPass = document.getElementById('inp-new-pass');
+    // Icons for Password Toggle
+    const iconEye = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+    const iconEyeOff = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+
+    // --- Password Toggle Logic ---
+    document.querySelectorAll('.password-toggle').forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            const input = toggle.previousElementSibling;
+            if (!input) return;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                toggle.innerHTML = iconEye; // Show open eye
+            } else {
+                input.type = 'password';
+                toggle.innerHTML = iconEyeOff; // Show eye with slash
+            }
+        });
+    });
+
+    // --- Enter Key to Submit Login ---
+    if (inpPass) {
+        inpPass.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                btnSubmit.click();
+            }
+        });
+    }
 
     // --- Core Functions ---
     function showToast(message) {
@@ -56,17 +101,25 @@ document.addEventListener('DOMContentLoaded', () => {
             if(usernameDisplay) usernameDisplay.textContent = username;
             if(linkMyHome) linkMyHome.href = `/${username}/index.html`;
             
-            // 如果在设置页，加载绑定状态
+            // Check Page Ownership for Dashboard
+            const pageOwnerMeta = document.querySelector('meta[name="page-owner"]');
+            if (pageOwnerMeta && dashboardActions) {
+                const pageOwner = pageOwnerMeta.getAttribute('content');
+                if (pageOwner === username) {
+                    dashboardActions.style.display = 'flex';
+                }
+            }
+
             if (document.getElementById('platform-list')) {
                 updateBindings();
             }
         } else {
             if(guestArea) guestArea.style.display = 'inline-block';
             if(userArea) userArea.style.display = 'none';
+            if(dashboardActions) dashboardActions.style.display = 'none';
         }
     }
 
-    // [新增] 获取绑定状态并更新按钮样式
     async function updateBindings() {
         try {
             const res = await fetch('/api/auth/bindings', {
@@ -75,22 +128,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             const boundPlatforms = new Set(data.bindings || []);
 
-            // 更新绑定按钮状态
             document.querySelectorAll('.btn-bind').forEach(btn => {
                 const platform = btn.dataset.platform;
+                if (!platform) return;
                 btn.classList.remove('status-loading', 'status-bound', 'status-unbound');
                 
                 if (boundPlatforms.has(platform)) {
-                    btn.textContent = '更新'; // 已绑定显示更新
-                    btn.classList.add('status-bound'); // 绿色
+                    btn.textContent = '更新'; 
+                    btn.classList.add('status-bound'); 
                 } else {
-                    btn.textContent = '绑定'; // 未绑定显示绑定
-                    btn.classList.add('status-unbound'); // 蓝色
+                    btn.textContent = '绑定'; 
+                    btn.classList.add('status-unbound'); 
                 }
                 btn.disabled = false;
             });
 
-            // 更新解绑按钮显隐
             document.querySelectorAll('.btn-unbind').forEach(btn => {
                 const platform = btn.dataset.platform;
                 if (boundPlatforms.has(platform)) {
@@ -120,7 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (res.ok) {
                 showToast('已解除绑定');
-                updateBindings(); // 刷新 UI
+                updateBindings();
             } else {
                 showToast('解绑失败');
             }
@@ -131,21 +183,168 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateUI();
 
-    // 坐标转换函数（保留以备将来使用）
-    function convertCoordinates(clientX, clientY, imgElement) {
-        const rect = imgElement.getBoundingClientRect();
-        const displayX = clientX - rect.left;
-        const displayY = clientY - rect.top;
-        
-        return {
-            x: displayX,
-            y: displayY,
-            display_width: rect.width,
-            display_height: rect.height
-        };
+    // --- Create Post Logic ---
+    if (btnCreatePost) {
+        btnCreatePost.addEventListener('click', async () => {
+            btnCreatePost.disabled = true;
+            btnCreatePost.textContent = '创建中...';
+            try {
+                const res = await fetch('/api/post/create', {
+                    method: 'POST',
+                    headers: { 'Authorization': localStorage.getItem('mc_token') }
+                });
+                if (res.ok) {
+                    showToast('创建成功，正在跳转...');
+                    location.reload(); 
+                } else {
+                    showToast('创建失败');
+                    btnCreatePost.disabled = false;
+                    btnCreatePost.textContent = '创建文章';
+                }
+            } catch (e) {
+                showToast('网络错误');
+                btnCreatePost.disabled = false;
+            }
+        });
     }
 
-    // --- Auth Process Loop (轮询会话状态) ---
+    // --- Migrate Post Logic ---
+    if (btnMigrateTrigger) {
+        btnMigrateTrigger.addEventListener('click', () => {
+            if (migrateModal) {
+                migrateModal.classList.add('open');
+                // Reset State
+                migrateInputArea.style.display = 'block';
+                migrateProgressArea.style.display = 'none';
+                migrateLogs.innerHTML = '';
+                inpMigrateUrl.value = '';
+                btnCloseMigrate.style.display = 'none';
+                if (btnStopMigrate) btnStopMigrate.style.display = 'block';
+            }
+        });
+    }
+
+    if (btnCancelMigrate) {
+        btnCancelMigrate.addEventListener('click', () => {
+            if (migrateModal) migrateModal.classList.remove('open');
+        });
+    }
+
+    // Stop Migration
+    if (btnStopMigrate) {
+        btnStopMigrate.addEventListener('click', () => {
+            if (migrateAbortController) {
+                migrateAbortController.abort();
+                const line = document.createElement('div');
+                line.textContent = `> [操作] 用户已中止迁移。`;
+                line.style.color = '#ef4444';
+                migrateLogs.appendChild(line);
+                migrateLogs.scrollTop = migrateLogs.scrollHeight;
+                
+                btnStopMigrate.style.display = 'none';
+                
+                // Show close button
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'btn-action cancel'; // Matches style
+                closeBtn.style.flex = '1';
+                closeBtn.textContent = '关闭';
+                closeBtn.onclick = () => location.reload();
+                
+                const actionContainer = btnCloseMigrate.parentElement;
+                actionContainer.innerHTML = ''; 
+                actionContainer.appendChild(closeBtn);
+            }
+        });
+    }
+
+    if (btnStartMigrate) {
+        btnStartMigrate.addEventListener('click', async () => {
+            const url = inpMigrateUrl.value.trim();
+            if (!url) return showToast('请输入链接');
+
+            migrateInputArea.style.display = 'none';
+            migrateProgressArea.style.display = 'block';
+            if (btnStopMigrate) btnStopMigrate.style.display = 'block';
+            
+            const log = (msg) => {
+                const line = document.createElement('div');
+                line.textContent = `> ${msg}`;
+                migrateLogs.appendChild(line);
+                migrateLogs.scrollTop = migrateLogs.scrollHeight;
+            };
+
+            log(`开始连接服务器...`);
+
+            migrateAbortController = new AbortController();
+
+            try {
+                const response = await fetch('/api/post/migrate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': localStorage.getItem('mc_token')
+                    },
+                    body: JSON.stringify({ url }),
+                    signal: migrateAbortController.signal
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let buffer = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n\n");
+                    buffer = lines.pop(); 
+
+                    for (const line of lines) {
+                        if (line.startsWith("data: ")) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                if (data.step) {
+                                    log(data.step);
+                                } else if (data.success) {
+                                    log(`[成功] 文章已创建 (CID: ${data.cid})`);
+                                    if (btnStopMigrate) btnStopMigrate.style.display = 'none';
+                                    btnCloseMigrate.style.display = 'block';
+                                } else if (data.error) {
+                                    log(`[错误] ${data.error}`);
+                                    log(`操作已终止。`);
+                                    if (btnStopMigrate) btnStopMigrate.style.display = 'none';
+                                    
+                                    const retryBtn = document.createElement('button');
+                                    retryBtn.className = 'btn-action cancel';
+                                    retryBtn.style.flex = '1';
+                                    retryBtn.textContent = '关闭';
+                                    retryBtn.onclick = () => location.reload();
+                                    
+                                    const actionContainer = btnCloseMigrate.parentElement;
+                                    actionContainer.innerHTML = '';
+                                    actionContainer.appendChild(retryBtn);
+                                }
+                            } catch (e) {
+                                console.error("Parse Error", e);
+                            }
+                        }
+                    }
+                }
+
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    // Handled
+                } else {
+                    log(`[网络错误] ${e.message}`);
+                }
+            } finally {
+                migrateAbortController = null;
+            }
+        });
+    }
+
+    // --- Auth Process Loop ---
     async function pollLoop() {
         if (!isAuthPolling || !currentSessionId) return;
 
@@ -153,7 +352,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const statusRes = await fetch(`/api/auth/status?session_id=${currentSessionId}`);
             const statusData = await statusRes.json();
             
-            // 检查登录状态
             if (statusData.status === 'authenticated') {
                 isAuthPolling = false;
                 showToast('绑定成功！');
@@ -168,7 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentSessionId = null;
                 return;
             }
-            // 'pending' 状态继续轮询
         } catch (e) {
             console.error('Poll error:', e);
         }
@@ -181,8 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
     window.startAuth = async (platform) => {
         try {
             const token = localStorage.getItem('mc_token');
-            
-            // 第1步：向服务器请求初始化验证会话
             const initRes = await fetch('/api/auth/init', {
                 method: 'POST',
                 headers: { 
@@ -192,17 +387,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({ platform })
             });
             
-            if (!initRes.ok) {
-                throw new Error('启动失败');
-            }
+            if (!initRes.ok) throw new Error('启动失败');
 
             const initData = await initRes.json();
             currentSessionId = initData.session_id;
             
             showToast('正在启动验证客户端...');
-            
-            // 第2步：向本地客户端发送验证请求
-            // 本地客户端应在 http://127.0.0.1:9999 监听
             const clientUrl = 'http://127.0.0.1:9999/verify';
             
             setTimeout(async () => {
@@ -219,7 +409,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (verifyRes.ok) {
                         showToast('验证客户端已启动，请在浏览器中完成登录');
-                        // 开始轮询检查验证状态
                         isAuthPolling = true;
                         pollLoop();
                     } else {
@@ -240,7 +429,6 @@ document.addEventListener('DOMContentLoaded', () => {
         btnCancelQr.addEventListener('click', async () => {
             isAuthPolling = false;
             qrModal.classList.remove('open');
-            
             if (currentSessionId) {
                 try {
                     await fetch('/api/auth/cancel', {
@@ -256,16 +444,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Standard Event Listeners ---
     if (btnLogout) {
         btnLogout.addEventListener('click', (e) => {
             e.preventDefault();
-            // 清除 LocalStorage 和 Cookie
             localStorage.removeItem('mc_token');
             localStorage.removeItem('mc_username');
-            // 设置过期时间以删除 Cookie
             document.cookie = "mc_token=; path=/; max-age=0";
-            
             updateUI();
             if (window.location.pathname.includes('settings')) window.location.href = '/';
         });
@@ -303,8 +487,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.cookie = `mc_token=${data.token}; path=/; max-age=86400`;
                     
                     closeModal();
-                    updateUI();
                     showToast('登录成功');
+                    
+                    // [Fix] Add delay for toast visibility
+                    setTimeout(() => {
+                        window.location.href = `/${u}/index.html`;
+                    }, 800);
                 } else throw new Error('登录失败');
             } catch (e) { showToast(e.message); }
         });
@@ -330,13 +518,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         new_password: inpNewPass.value 
                     })
                 });
+                
                 if (res.ok) { 
                     showToast('密码修改成功'); 
                     inpOldPass.value=''; 
                     inpNewPass.value=''; 
+                } else {
+                    const errData = await res.json();
+                    showToast(errData.error || '修改失败');
                 }
-                else showToast('修改失败');
-            } catch (e) { showToast('网络错误'); }
+            } catch (e) { 
+                showToast('网络错误: ' + e.message); 
+            }
         });
     }
 });

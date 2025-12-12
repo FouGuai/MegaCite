@@ -33,11 +33,23 @@
                 <header class="post-header">
                     <h1 class="post-title">{title}</h1>
                     <div class="post-meta-row">
-                        <a href="/{author}/index.html" style="font-weight: 500; color: var(--vp-c-text-1);">{author}</a>
-                        <span style="color: var(--vp-c-divider);">|</span>
-                        <span class="post-tag">{category}</span>
-                        <span style="color: var(--vp-c-divider);">|</span>
-                        <span>{date}</span>
+                        <div class="meta-item">
+                            <!-- User Icon -->
+                            <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            <a href="/{author}/index.html">{author}</a>
+                        </div>
+                        
+                        <div class="meta-item">
+                            <!-- Folder Icon -->
+                            <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                            <span>{category}</span>
+                        </div>
+                        
+                        <div class="meta-item">
+                            <!-- Clock Icon -->
+                            <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            <span>{date}</span>
+                        </div>
                     </div>
                 </header>
 
@@ -58,7 +70,7 @@
         </main>
 
         <footer class="VPFooter">
-            © 2025 MegaCite.
+            © 2025 MegaCite Project. Released under the Apache-2.0 License.
         </footer>
     </div>
 
@@ -70,10 +82,17 @@
                 <div class="modal-tab" id="tab-register">注册</div>
             </div>
             <div class="modal-inner">
-                <input id="inp-username" type="text" class="form-input" placeholder="用户名">
-                <input id="inp-password" type="password" class="form-input" placeholder="密码">
-                <button id="btn-submit-auth" class="btn-submit">提交</button>
-                <span id="btn-cancel-login" class="btn-cancel">取消</span>
+                <input id="inp-username" type="text" class="form-input" placeholder="用户名" autocomplete="off">
+                <div class="password-wrapper">
+                    <input id="inp-password" type="password" class="form-input" placeholder="密码">
+                    <span class="password-toggle">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                    </span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 16px;">
+                    <button id="btn-submit-auth" class="btn-action primary" style="flex:1;">立即登录</button>
+                    <button id="btn-cancel-login" class="btn-action cancel" style="flex:1; margin: 0;">暂不登录</button>
+                </div>
             </div>
         </div>
     </div>
