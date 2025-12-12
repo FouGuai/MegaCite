@@ -75,23 +75,59 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             const boundPlatforms = new Set(data.bindings || []);
 
+            // 更新绑定按钮状态
             document.querySelectorAll('.btn-bind').forEach(btn => {
                 const platform = btn.dataset.platform;
                 btn.classList.remove('status-loading', 'status-bound', 'status-unbound');
                 
                 if (boundPlatforms.has(platform)) {
-                    btn.textContent = '重新绑定';
-                    btn.classList.add('status-bound');
+                    btn.textContent = '更新'; // 已绑定显示更新
+                    btn.classList.add('status-bound'); // 绿色
                 } else {
-                    btn.textContent = '绑定';
-                    btn.classList.add('status-unbound');
+                    btn.textContent = '绑定'; // 未绑定显示绑定
+                    btn.classList.add('status-unbound'); // 蓝色
                 }
                 btn.disabled = false;
             });
+
+            // 更新解绑按钮显隐
+            document.querySelectorAll('.btn-unbind').forEach(btn => {
+                const platform = btn.dataset.platform;
+                if (boundPlatforms.has(platform)) {
+                    btn.style.display = 'inline-block';
+                } else {
+                    btn.style.display = 'none';
+                }
+            });
+
         } catch (e) {
             console.error("Failed to fetch bindings", e);
         }
     }
+
+    window.unbindAuth = async (platform) => {
+        if (!confirm(`确定要解除 ${platform} 的绑定吗？这意味着您将无法自动同步该平台的文章。`)) return;
+
+        try {
+            const res = await fetch('/api/auth/unbind', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': localStorage.getItem('mc_token')
+                },
+                body: JSON.stringify({ platform })
+            });
+            
+            if (res.ok) {
+                showToast('已解除绑定');
+                updateBindings(); // 刷新 UI
+            } else {
+                showToast('解绑失败');
+            }
+        } catch (e) {
+            showToast('网络错误');
+        }
+    };
 
     updateUI();
 

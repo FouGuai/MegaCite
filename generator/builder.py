@@ -12,8 +12,12 @@ class StaticSiteGenerator:
         self.renderer = HTMLRenderer()
 
     def init_output_dir(self):
-        if not os.path.exists(self.base_dir):
-            os.makedirs(self.base_dir)
+        # [修改] 强制清空并重新创建 public 目录
+        if os.path.exists(self.base_dir):
+            shutil.rmtree(self.base_dir)
+            print(f"[Gen] Cleaned output directory: {self.base_dir}")
+            
+        os.makedirs(self.base_dir)
             
         current_dir = os.path.dirname(__file__)
         project_root = os.path.dirname(current_dir)
@@ -21,6 +25,7 @@ class StaticSiteGenerator:
         
         if os.path.exists(assets_dir):
             try:
+                # 使用 copytree 的 dirs_exist_ok=True (虽然目录已重建，加上更稳妥)
                 shutil.copytree(assets_dir, self.base_dir, dirs_exist_ok=True)
                 print(f"[Gen] Assets copied from {assets_dir}")
             except Exception as e:

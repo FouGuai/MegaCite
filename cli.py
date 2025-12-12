@@ -31,6 +31,11 @@ def main():
 
     user_subs.add_parser("logout", help="Logout from system")
 
+    # [新增] 修改密码命令
+    passwd_parser = user_subs.add_parser("password", help="Change password")
+    passwd_parser.add_argument("old_password", help="Current password")
+    passwd_parser.add_argument("new_password", help="New password")
+
     # --- auth (New) ---
     auth_parser = subparsers.add_parser("auth", help="External platform authentication")
     auth_subs = auth_parser.add_subparsers(dest="action", required=True)
@@ -86,6 +91,14 @@ def main():
             elif args.action == "logout":
                 login_store.clear_local_token()
                 print("Logged out.")
+            elif args.action == "password":
+                # [新增] 修改密码逻辑
+                token = login_store.load_local_token()
+                if not token:
+                    print("Error: Please login first.")
+                else:
+                    auth.change_password(token, args.old_password, args.new_password)
+                    print("Password changed successfully.")
 
         # 处理 Auth 命令
         elif args.command == "auth":
@@ -128,6 +141,8 @@ def main():
 
     except PermissionError as e:
         print(f"Permission Denied: {e}")
+    except ValueError as e:
+        print(f"Validation Error: {e}")
     except Exception as e:
         print(f"Error: {e}")
 

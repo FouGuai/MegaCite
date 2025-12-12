@@ -21,7 +21,8 @@ CREATE TABLE auth_platforms (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
     platform VARCHAR(50) NOT NULL,
-    credential VARCHAR(255) DEFAULT NULL,
+    -- [修复] Cookie 数据极大，VARCHAR(255) 必定报错，改为 LONGTEXT
+    credential LONGTEXT DEFAULT NULL,
     UNIQUE KEY ux_user_platform (user_id, platform),
     CONSTRAINT fk_auth_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

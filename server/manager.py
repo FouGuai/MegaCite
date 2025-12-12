@@ -117,9 +117,22 @@ def server_start(port: int) -> None:
                 if self.path == '/api/login':
                     token = user_login(data.get('username'), data.get('password'))
                     self._send_json({'token': token})
+                
                 elif self.path == '/api/register':
-                    user_register(data.get('username'), data.get('password'))
+                    # 注册并获取 UserID
+                    uid = user_register(data.get('username'), data.get('password'))
+                    
+                    # [修复] 注册成功后立即生成用户首页
+                    # 避免前端跳转时出现 404
+                    try:
+                        gen = StaticSiteGenerator(WEB_ROOT)
+                        gen.sync_user_index(uid)
+                        print(f"[*] Initial index generated for user {uid}")
+                    except Exception as gen_err:
+                        print(f"[-] Failed to generate initial index: {gen_err}")
+                    
                     self._send_json({'status': 'ok'})
+                
                 elif self.path == '/api/change_password':
                     token = self.headers.get('Authorization')
                     change_password(token, data.get('old_password'), data.get('new_password'))
@@ -182,6 +195,30 @@ def server_start(port: int) -> None:
                         self._send_json({'status': 'cancelled'})
                     except Exception as e:
                         self.send_error(400, str(e))
+
+                elif self.path == '/api/auth/unbind':
+                    """解除绑定"""
+                    try:
+                        token = self.headers.get('Authorization')
+                        if not token and "Cookie" in self.headers:
+                            cookie = http.cookies.SimpleCookie(self.headers["Cookie"])
+                            if "mc_token" in cookie:
+                                token = cookie["mc_token"].value
+                        
+                        user_id = verify_token(token)
+                        platform = data.get('platform')
+                        
+                        conn = create_connection()
+                        try:
+                            dao = MySQLAuthDAO(conn)
+                            dao.remove_platform_auth(user_id, platform)
+                        finally:
+                            conn.close()
+                        
+                        self._send_json({'status': 'ok'})
+                    except Exception as e:
+                        self.send_error(400, str(e))
+
                 else:
                     self.send_error(404)
             except Exception as e:

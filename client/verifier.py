@@ -24,6 +24,18 @@ class VerificationHandler(BaseHTTPRequestHandler):
     
     # 共享的服务器实例引用
     app_server = None
+
+    def _send_cors_headers(self):
+        """发送 CORS 响应头，允许浏览器跨域访问"""
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+    
+    def do_OPTIONS(self):
+        """处理 CORS 预检请求"""
+        self.send_response(200)
+        self._send_cors_headers()
+        self.end_headers()
     
     def do_POST(self):
         """处理 POST 请求"""
@@ -31,6 +43,7 @@ class VerificationHandler(BaseHTTPRequestHandler):
             self._handle_verify()
         else:
             self.send_response(404)
+            self._send_cors_headers()
             self.end_headers()
     
     def _handle_verify(self):
@@ -47,6 +60,7 @@ class VerificationHandler(BaseHTTPRequestHandler):
             
             if not session_id or not platform:
                 self.send_response(400)
+                self._send_cors_headers()
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "error", "message": "Missing session_id or platform"}).encode())
                 return
@@ -66,6 +80,7 @@ class VerificationHandler(BaseHTTPRequestHandler):
             
             # 立即返回响应
             self.send_response(200)
+            self._send_cors_headers()
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({"status": "started"}).encode())
@@ -73,6 +88,7 @@ class VerificationHandler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"[-] Error handling verify request: {e}")
             self.send_response(500)
+            self._send_cors_headers()
             self.end_headers()
             self.wfile.write(json.dumps({"status": "error", "message": str(e)}).encode())
     

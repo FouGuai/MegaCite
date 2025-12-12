@@ -28,6 +28,17 @@ class MySQLUserDAO:
             return None
         return User(id=row[0], username=row[1], password_hash=row[2])
 
+    def get_user_by_id(self, user_id: int) -> User | None:
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, username, password_hash FROM users WHERE id = %s",
+                (user_id,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        return User(id=row[0], username=row[1], password_hash=row[2])
+
     def update_user(self, user_id: int, updates: dict[str, any]) -> bool:
         if not updates:
             return False
