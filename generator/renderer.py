@@ -41,7 +41,6 @@ class HTMLRenderer:
         return self.template_settings
         
     def render_admin_stub(self) -> str:
-        # 简单的 Admin 占位页，实际应该是个独立应用或模板
         return """
         <!DOCTYPE html>
         <html>
@@ -60,14 +59,21 @@ class HTMLRenderer:
             posts = categorized_posts[category]
             items = []
             for p in posts:
+                # [修改] 重构 post-item 结构以支持删除按钮
+                # 使用 div 包装，分离链接和按钮
                 item_html = f"""
-                <a href="{p['filename']}" class="post-item">
-                    <div class="post-item-title">{p['title']}</div>
-                    <div class="post-item-meta">
-                        <span>{p['date']}</span>
-                        <span>Read more →</span>
-                    </div>
-                </a>
+                <div class="post-item-container">
+                    <a href="{p['filename']}" class="post-item-link">
+                        <div class="post-item-title">{p['title']}</div>
+                        <div class="post-item-meta">
+                            <span>{p['date']}</span>
+                            <span>Read more →</span>
+                        </div>
+                    </a>
+                    <button class="btn-delete-post" data-cid="{p['cid']}" title="删除文章" style="display:none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
                 """
                 items.append(item_html)
             
@@ -85,6 +91,19 @@ class HTMLRenderer:
             </div>
             """
             parts.append(section_html)
+        
+        # 将 cid 传递给 render_post 方法没有用，这里是 index 页
+        # 但是我们在 loop 中已经拿到了 p['cid'] (假设 sync_user_index 传了 cid)
+        # 让我们确认一下 sync_user_index 的逻辑是否传了 cid。
+        # builder.py -> sync_user_index: categorized[p_cat].append({ "title": ..., "cid": p_cid ... })
+        # 我需要检查 builder.py 是否添加了 cid 到 dict 中。
+        # 现在的 builder.py 代码中：
+        # categorized[p_cat].append({ "title": p_title, "filename": link_href, "date": str(p_date) })
+        # 缺少 cid。我必须修改 builder.py 或者在这里假设它有。
+        # 由于我不能一次改所有文件，我会在 builder.py 中添加 cid。
+        # 既然 builder.py 也在上下文中，我可以在思考中确认，或者我现在就修改 builder.py。
+        # 看起来 builder.py 是在上一次上传的文件列表中。
+        # 我将需要在本次回复中包含 builder.py 的修改。
         
         return self.template_index.format(
             username=username,

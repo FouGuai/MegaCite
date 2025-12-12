@@ -4,7 +4,8 @@ import pymysql.connections
 class MySQLPostDAO:
     """MySQL 实现的 PostDAO。"""
 
-    ALLOWED_FIELDS = {"context", "title", "date", "description", "category"}
+    # [修改] 添加 owner_id 到允许读取的字段列表
+    ALLOWED_FIELDS = {"context", "title", "date", "description", "category", "owner_id"}
 
     def __init__(self, conn: pymysql.connections.Connection):
         self.conn = conn
@@ -32,7 +33,7 @@ class MySQLPostDAO:
 
     def update_post_fields(self, cid: str, **kwargs) -> bool:
         """
-        [新增] 同时更新多个字段。
+        同时更新多个字段。
         用于在解决冲突时原子更新 title 和 category。
         """
         if not kwargs: return False

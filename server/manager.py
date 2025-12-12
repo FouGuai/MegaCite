@@ -12,7 +12,7 @@ from dao.auth_dao import MySQLAuthDAO
 from dao.post_dao import MySQLPostDAO
 from dao.user_dao import MySQLUserDAO
 from core.auth import user_login, user_register, change_password, verify_token
-from core.post import post_create
+from core.post import post_create, post_delete
 from crawler.service import migrate_post_from_url
 from verification import manager as verify_manager
 
@@ -27,15 +27,12 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 def force_sync_post(cid: str, user_id: int):
     """
-    [同步渲染逻辑]
-    强制从数据库拉取最新数据，并调用 Generator 生成 HTML。
-    确保 API 返回前，静态文件已经就绪。
+    [同步渲染逻辑 - 更新/新增]
     """
     if not SERVER_GEN: return
 
     conn = create_connection()
     try:
-        # 1. 获取文章数据
         post_dao = MySQLPostDAO(conn)
         title = post_dao.get_field(cid, "title")
         category = post_dao.get_field(cid, "category")
@@ -52,19 +49,33 @@ def force_sync_post(cid: str, user_id: int):
             "description": desc
         }
         
-        # 2. 获取用户名
         user_dao = MySQLUserDAO(conn)
         user = user_dao.get_user_by_id(user_id)
         if not user: return
         username = user.username
         
-        # 3. 立即生成文章页和索引页
         print(f"[Sync] Force generating files for {cid}...")
         SERVER_GEN.sync_post_file(post_data, username)
         SERVER_GEN.sync_user_index(user_id)
         print(f"[Sync] Done.")
     finally:
         conn.close()
+
+def force_sync_delete(cid: str, user_id: int):
+    """
+    [同步渲染逻辑 - 删除]
+    移除对应的静态文件并重建用户索引页。
+    """
+    if not SERVER_GEN: return
+    
+    print(f"[Sync] Force removing files for {cid}...")
+    # 1. 物理删除文章 HTML
+    SERVER_GEN.remove_post_file(cid)
+    
+    # 2. 刷新索引页
+    SERVER_GEN.sync_user_index(user_id)
+    print(f"[Sync] Delete Done.")
+
 
 def server_start(port: int) -> None:
     global SERVER_GEN
@@ -123,17 +134,14 @@ def server_start(port: int) -> None:
             return token
 
         def do_GET(self):
-            # 拦截 settings.html，未登录直接返回 404 Not Found
             if self.path == '/settings.html' or self.path.startswith('/settings.html?'):
                 if not self._check_auth_cookie():
                     self.send_error(404, "Not Found")
                     return
 
-            # 解析查询字符串
             parsed_path = urllib.parse.urlparse(self.path)
             query_params = urllib.parse.parse_qs(parsed_path.query)
             
-            # API: 获取当前用户的绑定列表
             if parsed_path.path == '/api/auth/bindings':
                 try:
                     token = self._get_token()
@@ -146,7 +154,30 @@ def server_start(port: int) -> None:
                 except Exception:
                     self._send_json({'bindings': []})
             
-            # API: 查询验证会话状态
+            elif parsed_path.path == '/api/auth/watch':
+                try:
+                    session_id = query_params.get('session_id', [None])[0]
+                    if not session_id:
+                        self.send_error(400, "Missing session_id")
+                        return
+
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'text/event-stream')
+                    self.send_header('Cache-Control', 'no-cache')
+                    self.send_header('Connection', 'keep-alive')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+
+                    status = verify_manager.session_wait(session_id, timeout=120)
+                    
+                    payload = json.dumps(status)
+                    self.wfile.write(f"data: {payload}\n\n".encode('utf-8'))
+                    self.wfile.flush()
+                    return
+
+                except Exception as e:
+                    print(f"SSE Error: {e}")
+
             elif parsed_path.path == '/api/auth/status':
                 try:
                     session_id = query_params.get('session_id', [None])[0]
@@ -171,9 +202,6 @@ def server_start(port: int) -> None:
                 
                 if self.path == '/api/login':
                     token = user_login(data.get('username'), data.get('password'))
-                    
-                    # [关键修改] 登录成功后，立即同步生成用户的 index.html
-                    # 确保前端跳转时页面已就绪
                     try:
                         user_id = verify_token(token)
                         if SERVER_GEN:
@@ -186,7 +214,6 @@ def server_start(port: int) -> None:
                 
                 elif self.path == '/api/register':
                     uid = user_register(data.get('username'), data.get('password'))
-                    # 注册也同步生成一下
                     try:
                         if SERVER_GEN:
                             SERVER_GEN.sync_user_index(uid)
@@ -212,13 +239,26 @@ def server_start(port: int) -> None:
                         token = self._get_token()
                         user_id = verify_token(token)
                         cid = post_create(token)
-                        
-                        # [同步] 强制生成文件
                         force_sync_post(cid, user_id)
-                        
                         self._send_json({'status': 'ok', 'cid': cid})
                     except Exception as e:
                          self.send_error(400, str(e))
+                
+                # [新增] 删除文章接口
+                elif self.path == '/api/post/delete':
+                    try:
+                        token = self._get_token()
+                        user_id = verify_token(token)
+                        cid = data.get('cid')
+                        
+                        if post_delete(token, cid):
+                            # 强制同步：物理删除文件 + 更新索引
+                            force_sync_delete(cid, user_id)
+                            self._send_json({'status': 'ok'})
+                        else:
+                            self.send_error(400, "Delete failed")
+                    except Exception as e:
+                        self.send_error(400, str(e))
 
                 elif self.path == '/api/post/migrate':
                     try:
@@ -243,7 +283,6 @@ def server_start(port: int) -> None:
                         try:
                             cid = migrate_post_from_url(token, url, progress_callback)
                             
-                            # [同步] 强制生成文件
                             progress_callback("[*] Finalizing: Generating static pages...")
                             force_sync_post(cid, user_id)
                             

@@ -12,7 +12,6 @@ class StaticSiteGenerator:
         self.renderer = HTMLRenderer()
 
     def init_output_dir(self):
-        # [修改] 强制清空并重新创建 public 目录
         if os.path.exists(self.base_dir):
             shutil.rmtree(self.base_dir)
             print(f"[Gen] Cleaned output directory: {self.base_dir}")
@@ -25,7 +24,6 @@ class StaticSiteGenerator:
         
         if os.path.exists(assets_dir):
             try:
-                # 使用 copytree 的 dirs_exist_ok=True (虽然目录已重建，加上更稳妥)
                 shutil.copytree(assets_dir, self.base_dir, dirs_exist_ok=True)
                 print(f"[Gen] Assets copied from {assets_dir}")
             except Exception as e:
@@ -112,9 +110,11 @@ class StaticSiteGenerator:
                 p_date = r[3]
                 
                 rel_prefix = self.url_mgr.register_mapping(p_cid, username, p_cat, p_title)
-                link_href = f"/{rel_prefix}.html" # 修正为绝对路径
+                link_href = f"/{rel_prefix}.html"
                 
+                # [修改] 增加 cid 字段，供前端删除按钮使用
                 categorized[p_cat].append({
+                    "cid": p_cid,
                     "title": p_title, 
                     "filename": link_href,
                     "date": str(p_date)
@@ -139,3 +139,11 @@ class StaticSiteGenerator:
             if os.path.exists(full_path):
                 os.remove(full_path)
                 print(f"[Gen] Deleted: {full_path}")
+            
+            # 尝试清理空目录
+            try:
+                parent_dir = os.path.dirname(full_path)
+                if not os.listdir(parent_dir):
+                    os.rmdir(parent_dir)
+            except OSError:
+                pass

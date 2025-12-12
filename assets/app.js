@@ -37,9 +37,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const migrateLogs = document.getElementById('migrate-logs');
     const btnCloseMigrate = document.getElementById('btn-close-migrate');
     
+    // Delete Modal Elements
+    const deleteModal = document.getElementById('delete-modal');
+    const btnConfirmDelete = document.getElementById('btn-confirm-delete');
+    const btnCancelDelete = document.getElementById('btn-cancel-delete');
+    let deleteTargetCid = null;
+
     // State Variables
-    let isAuthPolling = false;
     let currentSessionId = null;
+    let authEventSource = null; // [New] SSE Connection
     let isRegisterMode = false;
     let migrateAbortController = null; 
 
@@ -55,15 +61,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (input.type === 'password') {
                 input.type = 'text';
-                toggle.innerHTML = iconEye; // Show open eye
+                toggle.innerHTML = iconEye;
             } else {
                 input.type = 'password';
-                toggle.innerHTML = iconEyeOff; // Show eye with slash
+                toggle.innerHTML = iconEyeOff;
             }
         });
     });
 
-    // --- Enter Key to Submit Login ---
     if (inpPass) {
         inpPass.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
@@ -92,6 +97,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 3000);
     }
 
+    // Check for pending toast on load (Post-Refresh strategy)
+    const pendingToast = localStorage.getItem('mc_pending_toast');
+    if (pendingToast) {
+        showToast(pendingToast);
+        localStorage.removeItem('mc_pending_toast');
+    }
+
     function updateUI() {
         const token = localStorage.getItem('mc_token');
         const username = localStorage.getItem('mc_username');
@@ -101,12 +113,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if(usernameDisplay) usernameDisplay.textContent = username;
             if(linkMyHome) linkMyHome.href = `/${username}/index.html`;
             
-            // Check Page Ownership for Dashboard
             const pageOwnerMeta = document.querySelector('meta[name="page-owner"]');
             if (pageOwnerMeta && dashboardActions) {
                 const pageOwner = pageOwnerMeta.getAttribute('content');
                 if (pageOwner === username) {
                     dashboardActions.style.display = 'flex';
+                    // 显示删除按钮
+                    document.querySelectorAll('.btn-delete-post').forEach(btn => {
+                        btn.style.display = 'block';
+                    });
                 }
             }
 
@@ -183,37 +198,111 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateUI();
 
-    // --- Create Post Logic ---
+    // --- Delete Post Logic ---
+    document.querySelectorAll('.btn-delete-post').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            deleteTargetCid = btn.dataset.cid;
+            if(deleteModal) deleteModal.classList.add('open');
+        });
+    });
+
+    if (btnCancelDelete) {
+        btnCancelDelete.addEventListener('click', () => {
+            if(deleteModal) deleteModal.classList.remove('open');
+            deleteTargetCid = null;
+        });
+    }
+
+    if (btnConfirmDelete) {
+        btnConfirmDelete.addEventListener('click', async () => {
+            if (!deleteTargetCid) return;
+            
+            btnConfirmDelete.textContent = '删除中...';
+            btnConfirmDelete.disabled = true;
+
+            try {
+                const res = await fetch('/api/post/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': localStorage.getItem('mc_token')
+                    },
+                    body: JSON.stringify({ cid: deleteTargetCid })
+                });
+
+                if (res.ok) {
+                    localStorage.setItem('mc_pending_toast', '文章已删除');
+                    location.reload();
+                } else {
+                    const data = await res.json();
+                    showToast('删除失败: ' + (data.error || '未知错误'));
+                    btnConfirmDelete.textContent = '确认删除';
+                    btnConfirmDelete.disabled = false;
+                    deleteModal.classList.remove('open');
+                }
+            } catch (e) {
+                showToast('网络错误');
+                btnConfirmDelete.textContent = '确认删除';
+                btnConfirmDelete.disabled = false;
+                deleteModal.classList.remove('open');
+            }
+        });
+    }
+
+
     if (btnCreatePost) {
         btnCreatePost.addEventListener('click', async () => {
-            btnCreatePost.disabled = true;
+            // 防止重复点击（保险）
+            if (btnCreatePost.disabled) return;
+
+            const originalText = btnCreatePost.textContent;
+            btnCreatePost.disabled = true; // 立即禁用
             btnCreatePost.textContent = '创建中...';
+            
+            const startTime = Date.now();
+            let success = false;
+
             try {
                 const res = await fetch('/api/post/create', {
                     method: 'POST',
                     headers: { 'Authorization': localStorage.getItem('mc_token') }
                 });
+                
+                // 强制冷却: 无论请求多快，至少等 1 秒
+                const elapsed = Date.now() - startTime;
+                if (elapsed < 1000) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
+                }
+
                 if (res.ok) {
+                    success = true;
                     showToast('创建成功，正在跳转...');
                     location.reload(); 
                 } else {
                     showToast('创建失败');
-                    btnCreatePost.disabled = false;
-                    btnCreatePost.textContent = '创建文章';
                 }
             } catch (e) {
+                // 网络错误也要冷却
+                const elapsed = Date.now() - startTime;
+                if (elapsed < 1000) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 - elapsed));
+                }
                 showToast('网络错误');
-                btnCreatePost.disabled = false;
+            } finally {
+                // 只有失败才恢复按钮，成功的话页面都要刷新了
+                if (!success) {
+                    btnCreatePost.disabled = false;
+                    btnCreatePost.textContent = originalText;
+                }
             }
         });
     }
 
-    // --- Migrate Post Logic ---
     if (btnMigrateTrigger) {
         btnMigrateTrigger.addEventListener('click', () => {
             if (migrateModal) {
                 migrateModal.classList.add('open');
-                // Reset State
                 migrateInputArea.style.display = 'block';
                 migrateProgressArea.style.display = 'none';
                 migrateLogs.innerHTML = '';
@@ -230,7 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Stop Migration
     if (btnStopMigrate) {
         btnStopMigrate.addEventListener('click', () => {
             if (migrateAbortController) {
@@ -243,9 +331,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 btnStopMigrate.style.display = 'none';
                 
-                // Show close button
                 const closeBtn = document.createElement('button');
-                closeBtn.className = 'btn-action cancel'; // Matches style
+                closeBtn.className = 'btn-action cancel'; 
                 closeBtn.style.flex = '1';
                 closeBtn.textContent = '关闭';
                 closeBtn.onclick = () => location.reload();
@@ -334,7 +421,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (e) {
                 if (e.name === 'AbortError') {
-                    // Handled
                 } else {
                     log(`[网络错误] ${e.message}`);
                 }
@@ -342,37 +428,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 migrateAbortController = null;
             }
         });
-    }
-
-    // --- Auth Process Loop ---
-    async function pollLoop() {
-        if (!isAuthPolling || !currentSessionId) return;
-
-        try {
-            const statusRes = await fetch(`/api/auth/status?session_id=${currentSessionId}`);
-            const statusData = await statusRes.json();
-            
-            if (statusData.status === 'authenticated') {
-                isAuthPolling = false;
-                showToast('绑定成功！');
-                qrModal.classList.remove('open');
-                currentSessionId = null;
-                updateBindings();
-                return;
-            } else if (statusData.status === 'failed') {
-                isAuthPolling = false;
-                showToast('绑定失败: ' + (statusData.error || '未知错误'));
-                qrModal.classList.remove('open');
-                currentSessionId = null;
-                return;
-            }
-        } catch (e) {
-            console.error('Poll error:', e);
-        }
-
-        if (isAuthPolling) {
-            setTimeout(pollLoop, 500);
-        }
     }
 
     window.startAuth = async (platform) => {
@@ -393,6 +448,31 @@ document.addEventListener('DOMContentLoaded', () => {
             currentSessionId = initData.session_id;
             
             showToast('正在启动验证客户端...');
+            
+            if (authEventSource) authEventSource.close();
+            
+            authEventSource = new EventSource(`/api/auth/watch?session_id=${currentSessionId}`);
+            
+            authEventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.status === 'authenticated') {
+                    authEventSource.close();
+                    authEventSource = null;
+                    localStorage.setItem('mc_pending_toast', '绑定成功！');
+                    location.reload();
+                } else if (data.status === 'failed') {
+                    authEventSource.close();
+                    authEventSource = null;
+                    showToast('绑定失败: ' + (data.error || '未知错误'));
+                }
+            };
+
+            authEventSource.onerror = (err) => {
+                if (authEventSource && authEventSource.readyState === EventSource.CLOSED) {
+                } else {
+                }
+            };
+
             const clientUrl = 'http://127.0.0.1:9999/verify';
             
             setTimeout(async () => {
@@ -409,14 +489,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (verifyRes.ok) {
                         showToast('验证客户端已启动，请在浏览器中完成登录');
-                        isAuthPolling = true;
-                        pollLoop();
                     } else {
                         showToast('无法连接到本地客户端，请确保客户端正在运行');
+                        if (authEventSource) authEventSource.close();
                     }
                 } catch (e) {
                     showToast('无法连接到本地客户端，请确保客户端正在运行\n' + 
                               '启动方式: python client/verifier.py --server ' + window.location.origin);
+                    if (authEventSource) authEventSource.close();
                 }
             }, 500);
 
@@ -427,7 +507,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnCancelQr) {
         btnCancelQr.addEventListener('click', async () => {
-            isAuthPolling = false;
+            if (authEventSource) {
+                authEventSource.close();
+                authEventSource = null;
+            }
             qrModal.classList.remove('open');
             if (currentSessionId) {
                 try {
@@ -489,7 +572,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     closeModal();
                     showToast('登录成功');
                     
-                    // [Fix] Add delay for toast visibility
                     setTimeout(() => {
                         window.location.href = `/${u}/index.html`;
                     }, 800);

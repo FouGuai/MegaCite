@@ -50,7 +50,6 @@ def post_create(token: str) -> str:
     
     # 自动生成唯一默认标题: Untitled-{CID}
     default_title = f"Untitled-{new_cid}"
-    # [Modify] Capitalize Default
     default_cat = "Default"
     
     conn = create_connection()
@@ -76,13 +75,6 @@ def post_update(token: str, cid: str, field: str, value: str) -> bool:
             result = dao.update_field(cid, field, value)
         except pymysql.err.IntegrityError:
             # [冲突解决策略]
-            # 违反了 (owner_id, category, title) 的唯一约束
-            # 需要自动重命名标题以解决冲突
-            
-            # 1. 获取当前的 title 和 category
-            # 注意：如果是更新 category 导致的冲突，value 是新 category，我们需要修改 title 以适应新 category
-            # 如果是更新 title 导致的冲突，value 是新 title，我们需要修改这个新 title
-            
             current_title = dao.get_field(cid, "title")
             current_cat = dao.get_field(cid, "category")
             
@@ -91,13 +83,10 @@ def post_update(token: str, cid: str, field: str, value: str) -> bool:
             
             print(f"[Conflict] Collision detected for '{target_title}' in '{target_cat}'. Auto-resolving...")
 
-            # 2. 循环尝试生成不冲突的标题: "Title (1)", "Title (2)" ...
-            # 简单的死循环重试，直到成功
-            base_title = target_title
+            # 循环尝试生成不冲突的标题
             resolved = False
             
             while True:
-                # 解析当前尝试的标题，检查是否已有 (n) 后缀
                 match = re.search(r" \(([1-9]\d*)\)$", target_title)
                 if match:
                     n = int(match.group(1))
@@ -107,10 +96,6 @@ def post_update(token: str, cid: str, field: str, value: str) -> bool:
                     target_title = f"{target_title} (1)"
                 
                 try:
-                    # 尝试同时更新字段
-                    # 如果 field 是 category，我们必须同时更新 title (变了) 和 category (变了)
-                    # 如果 field 是 title，我们只更新 title (变了)
-                    
                     update_payload = {}
                     if field == "category":
                         update_payload = {"category": target_cat, "title": target_title}
@@ -122,7 +107,6 @@ def post_update(token: str, cid: str, field: str, value: str) -> bool:
                     print(f"[Conflict] Resolved to: '{target_title}'")
                     break
                 except pymysql.err.IntegrityError:
-                    # 仍然冲突 (例如 Title (1) 也存在)，继续循环 n+1
                     continue
             
             result = resolved
@@ -136,10 +120,19 @@ def post_update(token: str, cid: str, field: str, value: str) -> bool:
         conn.close()
 
 def post_delete(token: str, cid: str) -> bool:
-    verify_token(token)
+    user_id = verify_token(token)
     conn = create_connection()
     try:
         dao = MySQLPostDAO(conn)
+        
+        # [安全增强] 检查所有权
+        owner_id = dao.get_field(cid, "owner_id")
+        if owner_id is None:
+            return False # 文章不存在
+        
+        if owner_id != user_id:
+            raise PermissionError("You do not own this post.")
+            
         return dao.delete_post(cid)
     finally:
         conn.close()

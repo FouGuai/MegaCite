@@ -8,7 +8,7 @@ from dao.factory import create_connection
 from dao.auth_dao import MySQLAuthDAO
 import json
 import uuid
-from threading import Lock
+from threading import Lock, Event
 from time import time
 
 _sessions = {}
@@ -22,6 +22,8 @@ class VerificationSession:
         self.created_at = time()
         self.status = "pending"
         self.error_message = None
+        # 用于异步通知状态变更的事件锁
+        self.event = Event()
 
 def _get_verifier(platform_or_url: str):
     target = platform_or_url.lower()
@@ -62,7 +64,7 @@ def session_save_cookies(session_id: str, cookies: list) -> bool:
         session = _sessions.get(session_id)
         if not session: return False
     
-    # [修改] 传入 user_id 进行隔离存储
+    # 传入 user_id 进行隔离存储
     save_cookies(session.user_id, session.platform, cookies)
     
     try:
@@ -76,12 +78,34 @@ def session_save_cookies(session_id: str, cookies: list) -> bool:
     
     with _sessions_lock:
         session.status = "authenticated"
+        # 唤醒等待的线程
+        session.event.set()
     return True
 
 def session_get_status(session_id: str) -> dict:
     with _sessions_lock:
         session = _sessions.get(session_id)
     if not session: return {"status": "invalid"}
+    return {"status": session.status, "platform": session.platform, "error": session.error_message}
+
+def session_wait(session_id: str, timeout: int = 60) -> dict:
+    """
+    阻塞等待会话状态变更 (Long Polling / SSE 支持)
+    """
+    session = None
+    with _sessions_lock:
+        session = _sessions.get(session_id)
+    
+    if not session:
+        return {"status": "invalid"}
+        
+    # 如果状态已经是非 pending，直接返回
+    if session.status != "pending":
+        return {"status": session.status, "platform": session.platform, "error": session.error_message}
+        
+    # 阻塞等待事件触发或超时
+    session.event.wait(timeout)
+    
     return {"status": session.status, "platform": session.platform, "error": session.error_message}
 
 def session_close(session_id: str):
@@ -94,4 +118,6 @@ def session_save_error(session_id: str, error_message: str):
         if not session: return False
         session.status = "failed"
         session.error_message = error_message
+        # 唤醒等待的线程
+        session.event.set()
     return True
