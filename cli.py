@@ -2,7 +2,7 @@ import argparse
 import sys
 from core import auth, post
 from server import manager as server_manager
-from client import store
+from client import login_store
 import crawler
 # 新增验证模块
 from verification import manager as verify_manager
@@ -37,6 +37,9 @@ def main():
 
     auth_add = auth_subs.add_parser("add", help="Add platform authentication")
     auth_add.add_argument("platform", help="Platform name (e.g., csdn)")
+    
+    auth_clear = auth_subs.add_parser("clear", help="Clear platform authentication cookies")
+    auth_clear.add_argument("platform", help="Platform name (e.g., csdn)")
 
     # --- post ---
     post_parser = subparsers.add_parser("post", help="Post management")
@@ -78,19 +81,23 @@ def main():
                 print(f"User registered. ID: {uid}")
             elif args.action == "login":
                 token = auth.user_login(args.username, args.password)
-                store.save_local_token(token)
+                login_store.save_local_token(token)
                 print("Login successful.")
             elif args.action == "logout":
-                store.clear_local_token()
+                login_store.clear_local_token()
                 print("Logged out.")
 
         # 处理 Auth 命令
         elif args.command == "auth":
             if args.action == "add":
                 verify_manager.login_platform(args.platform)
+            elif args.action == "clear":
+                from client.cookie_store import clear_cookies
+                clear_cookies(args.platform)
+                print(f"Cleared cookies for {args.platform}")
 
         elif args.command == "post":
-            token = store.load_local_token()
+            token = login_store.load_local_token()
             
             if args.action == "list":
                 print(f"Posts: {post.post_list(token, args.count)}")

@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnLogout = document.getElementById('btn-logout');
     const linkMyHome = document.getElementById('link-my-home');
     
-    // Modals
     const modalOverlay = document.getElementById('login-modal');
     const btnCancel = document.getElementById('btn-cancel-login');
     const btnSubmit = document.getElementById('btn-submit-auth');
@@ -22,10 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // State Variables
     let isAuthPolling = false;
-    let lastMouseMove = 0; 
+    let currentSessionId = null;
     let isRegisterMode = false;
 
-    // Settings Form
     const settingsForm = document.getElementById('settings-form');
     const inpOldPass = document.getElementById('inp-old-pass');
     const inpNewPass = document.getElementById('inp-new-pass');
@@ -88,7 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     btn.textContent = '绑定';
                     btn.classList.add('status-unbound');
                 }
-                // 移除不可点击状态
                 btn.disabled = false;
             });
         } catch (e) {
@@ -98,107 +95,108 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateUI();
 
-    // --- Interaction Logic (点击 & 鼠标移动) ---
-    async function sendInteraction(type, data) {
-        if (!isAuthPolling) return;
-        try {
-            await fetch('/api/auth/interact', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type, ...data })
-            });
-        } catch (e) { console.error(e); }
+    // 坐标转换函数（保留以备将来使用）
+    function convertCoordinates(clientX, clientY, imgElement) {
+        const rect = imgElement.getBoundingClientRect();
+        const displayX = clientX - rect.left;
+        const displayY = clientY - rect.top;
+        
+        return {
+            x: displayX,
+            y: displayY,
+            display_width: rect.width,
+            display_height: rect.height
+        };
     }
 
-    if (qrImage) {
-        // 点击交互
-        qrImage.addEventListener('click', (e) => {
-            const rect = qrImage.getBoundingClientRect();
-            sendInteraction('click', {
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top,
-                width: rect.width,
-                height: rect.height
-            });
-        });
-
-        // 鼠标移动交互 (模拟 Hover 效果，节流处理)
-        qrImage.addEventListener('mousemove', (e) => {
-            const now = Date.now();
-            if (now - lastMouseMove > 80) { // 约 12fps 的采样率
-                lastMouseMove = now;
-                const rect = qrImage.getBoundingClientRect();
-                sendInteraction('mousemove', {
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top,
-                    width: rect.width,
-                    height: rect.height
-                });
-            }
-        });
-    }
-
-    // --- Auth Process Loop (Stream) ---
+    // --- Auth Process Loop (轮询会话状态) ---
     async function pollLoop() {
-        if (!isAuthPolling) return;
+        if (!isAuthPolling || !currentSessionId) return;
 
         try {
-            // 并行请求：同时获取截图和状态
-            const [shotRes, statusRes] = await Promise.all([
-                fetch('/api/auth/screenshot'),
-                fetch('/api/auth/status')
-            ]);
-
-            const shotData = await shotRes.json();
+            const statusRes = await fetch(`/api/auth/status?session_id=${currentSessionId}`);
             const statusData = await statusRes.json();
             
-            if (shotData.image) {
-                qrImage.src = `data:image/png;base64,${shotData.image}`;
-                qrImage.style.display = 'block';
-                qrLoading.style.display = 'none';
-            }
-
-            if (statusData.status === 'success') {
+            // 检查登录状态
+            if (statusData.status === 'authenticated') {
                 isAuthPolling = false;
                 showToast('绑定成功！');
                 qrModal.classList.remove('open');
-                updateBindings(); // 成功后刷新按钮状态
+                currentSessionId = null;
+                updateBindings();
+                return;
+            } else if (statusData.status === 'failed') {
+                isAuthPolling = false;
+                showToast('绑定失败: ' + (statusData.error || '未知错误'));
+                qrModal.classList.remove('open');
+                currentSessionId = null;
                 return;
             }
+            // 'pending' 状态继续轮询
         } catch (e) {
-            // 忽略网络错误，继续尝试
+            console.error('Poll error:', e);
         }
 
         if (isAuthPolling) {
-            // 使用 setTimeout 而非 setInterval，防止网络卡顿时请求堆积
-            setTimeout(pollLoop, 150); 
+            setTimeout(pollLoop, 500);
         }
     }
 
     window.startAuth = async (platform) => {
-        if (!qrModal) return;
-        qrModal.classList.add('open');
-        qrImage.style.display = 'none';
-        qrLoading.style.display = 'block';
-        qrLoading.textContent = '正在连接远程浏览器...';
-
         try {
+            const token = localStorage.getItem('mc_token');
+            
+            // 第1步：向服务器请求初始化验证会话
             const initRes = await fetch('/api/auth/init', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': token 
+                },
                 body: JSON.stringify({ platform })
             });
             
             if (!initRes.ok) {
-                throw new Error('启动失败，请检查服务器日志');
+                throw new Error('启动失败');
             }
 
-            isAuthPolling = true;
-            pollLoop(); 
+            const initData = await initRes.json();
+            currentSessionId = initData.session_id;
+            
+            showToast('正在启动验证客户端...');
+            
+            // 第2步：向本地客户端发送验证请求
+            // 本地客户端应在 http://127.0.0.1:9999 监听
+            const clientUrl = 'http://127.0.0.1:9999/verify';
+            
+            setTimeout(async () => {
+                try {
+                    const verifyRes = await fetch(clientUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: currentSessionId,
+                            platform: platform,
+                            server_url: window.location.origin
+                        })
+                    });
+                    
+                    if (verifyRes.ok) {
+                        showToast('验证客户端已启动，请在浏览器中完成登录');
+                        // 开始轮询检查验证状态
+                        isAuthPolling = true;
+                        pollLoop();
+                    } else {
+                        showToast('无法连接到本地客户端，请确保客户端正在运行');
+                    }
+                } catch (e) {
+                    showToast('无法连接到本地客户端，请确保客户端正在运行\n' + 
+                              '启动方式: python client/verifier.py --server ' + window.location.origin);
+                }
+            }, 500);
 
         } catch (e) {
             showToast('错误: ' + e.message);
-            qrModal.classList.remove('open');
         }
     };
 
@@ -206,7 +204,19 @@ document.addEventListener('DOMContentLoaded', () => {
         btnCancelQr.addEventListener('click', async () => {
             isAuthPolling = false;
             qrModal.classList.remove('open');
-            await fetch('/api/auth/cancel', { method: 'POST' });
+            
+            if (currentSessionId) {
+                try {
+                    await fetch('/api/auth/cancel', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session_id: currentSessionId })
+                    });
+                } catch (e) {
+                    console.error('Cancel error:', e);
+                }
+                currentSessionId = null;
+            }
         });
     }
 
@@ -238,13 +248,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!u || !p) return showToast('请输入账号密码');
             
             try {
-                if (isRegisterMode) await fetch('/api/register', { method: 'POST', body: JSON.stringify({username:u, password:p}) });
-                const res = await fetch('/api/login', { method: 'POST', body: JSON.stringify({username:u, password:p}) });
+                if (isRegisterMode) {
+                    await fetch('/api/register', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({username:u, password:p}) 
+                    });
+                }
+                const res = await fetch('/api/login', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({username:u, password:p}) 
+                });
                 if (res.ok) {
                     const data = await res.json();
                     localStorage.setItem('mc_token', data.token);
                     localStorage.setItem('mc_username', u);
-                    // [关键] 写入 Cookie 以便后端拦截静态页面请求
                     document.cookie = `mc_token=${data.token}; path=/; max-age=86400`;
                     
                     closeModal();
@@ -266,10 +285,20 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const res = await fetch('/api/change_password', {
                     method: 'POST',
-                    headers: { 'Authorization': localStorage.getItem('mc_token') },
-                    body: JSON.stringify({ old_password: inpOldPass.value, new_password: inpNewPass.value })
+                    headers: { 
+                        'Authorization': localStorage.getItem('mc_token'),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        old_password: inpOldPass.value, 
+                        new_password: inpNewPass.value 
+                    })
                 });
-                if (res.ok) { showToast('密码修改成功'); inpOldPass.value=''; inpNewPass.value=''; }
+                if (res.ok) { 
+                    showToast('密码修改成功'); 
+                    inpOldPass.value=''; 
+                    inpNewPass.value=''; 
+                }
                 else showToast('修改失败');
             } catch (e) { showToast('网络错误'); }
         });

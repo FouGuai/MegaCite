@@ -1,94 +1,81 @@
 import time
-import base64
 from playwright.sync_api import sync_playwright
 from client.cookie_store import save_cookies, load_cookies
 from verification.interface import PlatformVerifier
 
 class YuqueVerifier(PlatformVerifier):
-    def __init__(self):
-        self.playwright = None
-        self.browser = None
-        self.context = None
-        self.page = None
-        self._is_session_active = False
-
     def login(self) -> bool:
-        return False
-
-    def start_login_session(self) -> None:
-        print("[*] Starting Yuque headless session...")
-        self.playwright = sync_playwright().start()
-        self.browser = self.playwright.chromium.launch(headless=True)
-        self.context = self.browser.new_context(viewport={'width': 1280, 'height': 800})
-        self.page = self.context.new_page()
-        
+        print("[*] Launching browser for Yuque login...")
         try:
-            self.page.goto("https://www.yuque.com/login")
-            self.page.wait_for_load_state("domcontentloaded")
-            self._is_session_active = True
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=False)
+                context = browser.new_context()
+                page = context.new_page()
+
+                try:
+                    page.goto("https://www.yuque.com/login")
+                    print("[*] Please log in within 120 seconds...")
+
+                    # 判定标准：URL 跳转至 dashboard 或 个人主页 (不包含 login)
+                    page.wait_for_url(lambda u: "login" not in u and "yuque.com" in u, timeout=120000)
+                    
+                    # 等待页面完全加载，确保 Cookie 写入
+                    page.wait_for_load_state("networkidle")
+                    time.sleep(2)
+
+                    cookies = context.cookies()
+                    if cookies:
+                        save_cookies("yuque", cookies)
+                        print(f"[+] Login successful! Saved {len(cookies)} cookies.")
+                        return True
+                    return False
+                finally:
+                    browser.close()
         except Exception as e:
-            self.close_session()
-            raise e
-
-    def get_login_screenshot(self) -> str | None:
-        if not self._is_session_active or not self.page: return None
-        try:
-            png = self.page.screenshot(full_page=False)
-            return base64.b64encode(png).decode("utf-8")
-        except Exception:
-            return None
-
-    def handle_interaction(self, action: str, payload: dict) -> None:
-        if not self._is_session_active or not self.page: return
-        
-        try:
-            view_size = self.page.viewport_size
-            img_w = payload.get('width', 1)
-            img_h = payload.get('height', 1)
-            target_x = payload.get('x', 0) * (view_size['width'] / img_w)
-            target_y = payload.get('y', 0) * (view_size['height'] / img_h)
-            
-            if action == 'click':
-                self.page.mouse.click(target_x, target_y)
-            elif action == 'mousemove':
-                self.page.mouse.move(target_x, target_y)
-        except Exception:
-            pass
-
-    def check_login_status(self) -> bool:
-        if not self._is_session_active or not self.page: return False
-        try:
-            if "login" not in self.page.url and "yuque.com" in self.page.url:
-                cookies = self.context.cookies()
-                if cookies:
-                    save_cookies("yuque", cookies)
-                    return True
-        except Exception:
-            pass
-        return False
-
-    def close_session(self) -> None:
-        self._is_session_active = False
-        if self.page: self.page.close()
-        if self.context: self.context.close()
-        if self.browser: self.browser.close()
-        if self.playwright: self.playwright.stop()
-        self.page = None
-        self.context = None
-        self.browser = None
-        self.playwright = None
+            if "Executable doesn't exist" in str(e):
+                print("[-] Error: Playwright browsers are not installed. Run 'playwright install'.")
+            else:
+                print(f"[-] Login failed: {e}")
+            return False
 
     def check_ownership(self, url: str) -> bool:
-        cookies = load_cookies("yuque")
-        if not cookies: return False
+        cookies_list = load_cookies("yuque")
+        if not cookies_list:
+            print("[-] No Yuque cookies found. Run 'mc auth add yuque'.")
+            return False
+
+        print(f"[*] Verifying ownership for: {url}")
+        
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
-                context = browser.new_context()
-                context.add_cookies(cookies)
+                context = browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    viewport={"width": 1920, "height": 1080}
+                )
+                context.add_cookies(cookies_list)
+                
                 page = context.new_page()
-                page.goto(url, timeout=30000)
-                if page.locator('a:has-text("编辑")').count() > 0: return True
-                return False
-        except Exception:
+                try:
+                    page.goto(url, timeout=30000)
+                    page.wait_for_load_state("domcontentloaded")
+                    page.wait_for_timeout(2000)
+
+                    # 策略：检查页面是否存在只有作者可见的 "编辑" 按钮
+                    # 语雀的 DOM 结构较复杂，通常会有 "编辑" 文本的按钮或链接
+                    if page.locator('button:has-text("编辑")').count() > 0 or \
+                       page.locator('a:has-text("编辑")').count() > 0 or \
+                       page.locator('[aria-label="编辑"]').count() > 0:
+                        return True
+                    
+                    return False
+
+                except Exception as e:
+                    print(f"[-] Verification failed: {e}")
+                    return False
+                finally:
+                    browser.close()
+
+        except Exception as e:
+            print(f"[-] Playwright error: {e}")
             return False

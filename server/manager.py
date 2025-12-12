@@ -4,6 +4,7 @@ import http.cookies
 import os
 import threading
 import json
+import urllib.parse
 from generator.builder import StaticSiteGenerator
 from generator.watcher import DBWatcher
 from dao.factory import create_connection
@@ -14,8 +15,6 @@ from verification import manager as verify_manager
 PID_FILE = "server.pid"
 WEB_ROOT = "public"
 
-# [核心修复] 使用 ThreadingMixIn 实现多线程并发 HTTP 服务器
-# 这彻底解决了前端在轮询截图时，后续的点击交互请求被阻塞的问题
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
@@ -57,36 +56,27 @@ def server_start(port: int) -> None:
                 cookie = http.cookies.SimpleCookie(self.headers["Cookie"])
                 if "mc_token" in cookie:
                     token = cookie["mc_token"].value
-                    verify_token(token) # 验证失败会抛出异常
+                    verify_token(token)
                     return True
             except Exception:
                 pass
             return False
 
         def do_GET(self):
-            # [需求] 拦截 settings.html，未登录直接返回 404 Not Found
-            # 防止用户通过 URL 直接访问设置页
+            # 拦截 settings.html，未登录直接返回 404 Not Found
             if self.path == '/settings.html' or self.path.startswith('/settings.html?'):
                 if not self._check_auth_cookie():
                     self.send_error(404, "Not Found")
                     return
 
-            # API: 获取远程浏览器截图流
-            if self.path == '/api/auth/screenshot':
-                b64 = verify_manager.session_get_screenshot()
-                self._send_json({'image': b64})
+            # 解析查询字符串
+            parsed_path = urllib.parse.urlparse(self.path)
+            query_params = urllib.parse.parse_qs(parsed_path.query)
             
-            # API: 获取会话状态 (是否登录成功)
-            elif self.path == '/api/auth/status':
-                is_success = verify_manager.session_check_status()
-                self._send_json({'status': 'success' if is_success else 'waiting'})
-            
-            # API: 获取当前用户的绑定列表 (用于前端渲染按钮状态：绑定 vs 重新绑定)
-            elif self.path == '/api/auth/bindings':
+            # API: 获取当前用户的绑定列表
+            if parsed_path.path == '/api/auth/bindings':
                 try:
-                    # 优先尝试从 Header 获取 Token
                     token = self.headers.get('Authorization')
-                    # 如果 Header 没有，尝试从 Cookie 获取 (兼容页面直接刷新)
                     if not token and "Cookie" in self.headers:
                         cookie = http.cookies.SimpleCookie(self.headers["Cookie"])
                         if "mc_token" in cookie:
@@ -100,6 +90,19 @@ def server_start(port: int) -> None:
                     self._send_json({'bindings': platforms})
                 except Exception:
                     self._send_json({'bindings': []})
+            
+            # API: 查询验证会话状态
+            elif parsed_path.path == '/api/auth/status':
+                try:
+                    session_id = query_params.get('session_id', [None])[0]
+                    if not session_id:
+                        self.send_error(400, "Missing session_id")
+                        return
+                    
+                    status = verify_manager.session_get_status(session_id)
+                    self._send_json(status)
+                except Exception as e:
+                    self.send_error(400, str(e))
             
             else:
                 super().do_GET()
@@ -122,22 +125,63 @@ def server_start(port: int) -> None:
                     change_password(token, data.get('old_password'), data.get('new_password'))
                     self._send_json({'status': 'ok'})
                 
-                # --- Auth Session APIs ---
+                # --- 验证会话 APIs ---
                 elif self.path == '/api/auth/init':
-                    if verify_manager.session_start(data.get('platform')):
-                        self._send_json({'status': 'started'})
-                    else:
-                        self.send_error(400, "Start failed. Check logs.")
+                    """初始化验证会话"""
+                    try:
+                        token = self.headers.get('Authorization')
+                        if not token and "Cookie" in self.headers:
+                            cookie = http.cookies.SimpleCookie(self.headers["Cookie"])
+                            if "mc_token" in cookie:
+                                token = cookie["mc_token"].value
+                        
+                        user_id = verify_token(token)
+                        platform = data.get('platform')
+                        session_id = verify_manager.session_init(user_id, platform)
+                        
+                        if session_id:
+                            self._send_json({
+                                'session_id': session_id,
+                                'status': 'initialized',
+                                'platform': platform,
+                            })
+                        else:
+                            self.send_error(400, "Failed to initialize session")
+                    except Exception as e:
+                        self.send_error(400, str(e))
                 
-                elif self.path == '/api/auth/interact':
-                    verify_manager.session_handle_interaction(
-                        data.get('type'), data
-                    )
-                    self._send_json({'status': 'ok'})
-
+                elif self.path == '/api/auth/save_cookies':
+                    """本地客户端发送已验证的 Cookies"""
+                    try:
+                        session_id = data.get('session_id')
+                        cookies = data.get('cookies', [])
+                        
+                        if verify_manager.session_save_cookies(session_id, cookies):
+                            self._send_json({'status': 'ok'})
+                        else:
+                            self.send_error(400, "Failed to save cookies")
+                    except Exception as e:
+                        self.send_error(400, str(e))
+                
+                elif self.path == '/api/auth/save_error':
+                    """本地客户端报告验证错误"""
+                    try:
+                        session_id = data.get('session_id')
+                        error_msg = data.get('error')
+                        
+                        verify_manager.session_save_error(session_id, error_msg)
+                        self._send_json({'status': 'ok'})
+                    except Exception as e:
+                        self.send_error(400, str(e))
+                
                 elif self.path == '/api/auth/cancel':
-                    verify_manager.session_close()
-                    self._send_json({'status': 'cancelled'})
+                    """取消验证会话"""
+                    try:
+                        session_id = data.get('session_id')
+                        verify_manager.session_close(session_id)
+                        self._send_json({'status': 'cancelled'})
+                    except Exception as e:
+                        self.send_error(400, str(e))
                 else:
                     self.send_error(404)
             except Exception as e:
@@ -147,12 +191,12 @@ def server_start(port: int) -> None:
         def _send_json(self, data):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(json.dumps(data).encode())
 
     print(f"[+] Server started on port {port} (Multi-threaded).")
     try:
-        # 使用 ThreadingHTTPServer 启动
         with ThreadingHTTPServer(("0.0.0.0", port), Handler) as httpd:
             httpd.serve_forever()
     except KeyboardInterrupt:
